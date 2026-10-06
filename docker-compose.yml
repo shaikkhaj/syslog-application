@@ -1,0 +1,82 @@
+# ------------------------------------------------------------------
+# Network Syslog Monitoring & Incident Correlation Platform
+# Phase 1: backend + frontend + PostgreSQL + Redis
+#
+#   1. cp .env.example .env
+#   2. docker compose up --build
+#
+# Syslog is received on host port ${SYSLOG_HOST_PORT:-514} (UDP + TCP)
+# and forwarded to the backend listener on container port 514.
+# ------------------------------------------------------------------
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: syslog-platform-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-syslog_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-syslog_password}
+      POSTGRES_DB: ${POSTGRES_DB:-syslog_db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-syslog_user} -d ${POSTGRES_DB:-syslog_db}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: syslog-platform-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: syslog-platform-backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "${SYSLOG_HOST_PORT:-514}:514/udp"
+      - "${SYSLOG_HOST_PORT:-514}:514/tcp"
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: syslog-platform-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
