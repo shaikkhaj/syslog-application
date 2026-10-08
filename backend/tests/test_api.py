@@ -62,10 +62,10 @@ def test_events_endpoint_and_filters(client, db_ready):
     assert all(item["source_ip"] == "10.30.0.1" for item in body["items"])
 
     # Event type filter
-    response = client.get("/api/v1/events", params={"event_type": "auth_failure"})
+    response = client.get("/api/v1/events", params={"event_type": "AUTH_FAILURE"})
     body = response.json()
     assert body["total"] >= 1
-    assert all(item["event_type_code"] == "auth_failure" for item in body["items"])
+    assert all(item["event_type_code"] == "AUTH_FAILURE" for item in body["items"])
 
     # Invalid severity → validation error
     assert client.get("/api/v1/events", params={"severity": 42}).status_code == 422
@@ -97,4 +97,4 @@ def test_event_types_endpoint(client):
     response = client.get("/api/v1/event-types")
     assert response.status_code == 200
     codes = {item["code"] for item in response.json()}
-    assert {"link_down", "bgp_down", "auth_failure", "other"} <= codes
+    assert {"INTERFACE_DOWN", "BGP_DOWN", "AUTH_FAILURE", "OTHER"} <= codes

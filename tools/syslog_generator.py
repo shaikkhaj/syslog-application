@@ -43,6 +43,9 @@ def cisco_messages(now: datetime) -> list[str]:
         f"<134>{ts} rtr-core-01: %BGP-5-ADJCHANGE: neighbor 10.10.10.1 Up - Opened",
         f"<134>{ts} rtr-core-01: %OSPF-5-ADJCHG: Nbr 10.10.10.2 on GigabitEthernet0/0 from FULL to DOWN, Neighbor Down",
         f"<133>{ts} sw-access-01: %CPU_FALLBACK-3-HIGH_CPU: cpu_utilization=95% threshold=80% interval=60s",
+        f"<132>{ts} sw-access-01: %SYS-3-MEMHIGH: memory_usage=94% threshold=90% high memory utilization",
+        f"<134>{ts} rtr-core-01: %IPRT-5-ROUTE_CHANGE: route 10.9.0.0/16 changed via 10.10.10.2",
+        f"<130>{ts} rtr-core-01: %IPRT-4-UNREACHABLE: No route to host 10.5.5.5",
     ]
 
 
@@ -65,6 +68,18 @@ def fortigate_messages(now: datetime) -> list[str]:
         f'<184>{ts} devname="FGT60F-001" devid="FG60F000000001" logid="0100020009" '
         f'type="system" subtype="memory" level="error" msg="memory_usage=92% '
         f'threshold=90% high memory utilization"',
+        f'<184>{ts} devname="FGT60F-001" devid="FG60F000000001" logid="0100020010" '
+        f'type="system" subtype="cpu-usage" level="warning" msg="cpu_usage=96% '
+        f'threshold=90% high cpu"',
+        f'<187>{ts} devname="FGT60F-001" devid="FG60F000000001" logid="0100020002" '
+        f'type="admin" subtype="login" level="warning" srcip=203.0.113.44 '
+        f'action="login-failed" user="admin" msg="Administrator login failed from Web GUI"',
+        f'<186>{ts} devname="FGT60F-001" devid="FG60F000000001" logid="0100020011" '
+        f'type="event" subtype="global-setting" level="information" user="admin" '
+        f'msg="Configuration is changed by administrator"',
+        f'<186>{ts} devname="FGT60F-001" devid="FG60F000000001" logid="0100030001" '
+        f'type="event" subtype="router" level="notice" msg="static route '
+        f'10.20.0.0/24 changed via 10.10.5.1"',
     ]
 
 
@@ -77,10 +92,15 @@ def juniper_messages(now: datetime) -> list[str]:
         f"from OpenConfirm to Established",
         f"<14>{ts} mx-edge-01 rpd[1234]: OSPF neighbor 10.10.20.2 (via ge-0/0/0) state "
         f"moved from Full to Down",
+        f"<14>{ts} mx-edge-01 rpd[1234]: OSPF neighbor 10.10.20.2 (via ge-0/0/0) state "
+        f"moved from Down to Full",
         f'<14>{ts} mx-edge-01 mgd[2222]: UI_COMMIT_COMPLETED: cli command "commit" '
         f"executed by operator",
         f"<14>{ts} mx-edge-01 kernel: ge-0/0/0: link down, flapping detected",
         f"<12>{ts} mx-edge-01 bfdd[1337]: BFD session 10.10.20.1 state changed to Down",
+        f"<14>{ts} mx-edge-01 rpd[1234]: RTM_NEW: 172.16.10.0/24 via 10.10.20.1 "
+        f"flags RTF_GATEWAY",
+        f"<14>{ts} mx-edge-01 rpd[1234]: RTM_DEL: 172.16.11.0/24 via 10.10.20.1",
     ]
 
 
@@ -101,6 +121,11 @@ def linux_messages(now: datetime) -> list[str]:
         f"deploy(uid=1000)",
         f"<14>{ts} db01 kernel: [12345.678] eth1: interface error: input errors 120, "
         f"CRC errors 3",
+        f"<14>{ts} web01 hostagent: configuration file /etc/nginx/nginx.conf changed "
+        f"by user deploy",
+        f"<14>{iso} web01 networkd[500]: eth0: route added: 10.10.30.0/24 via 192.168.1.1",
+        f"<11>{ts} web01 probe[888]: probe failed: connect to 10.9.9.9:443 - "
+        f"No route to host",
     ]
 
 

@@ -21,14 +21,24 @@ logger = logging.getLogger(__name__)
 
 
 def process_message(raw: bytes, source_ip: str) -> object:
-    """Parse, normalize and store one syslog message (synchronous).
+    """Parse, normalize, store and run detection for one syslog message.
 
     Raises:
         ValueError: on an empty message (counted as a parse error).
     """
+    from app.detection.engine import get_detection_engine
+
     parsed = parse_syslog(raw)
     with SessionLocal() as db:
-        return save_event(db, parsed, source_ip, datetime.now(timezone.utc))
+        event = save_event(db, parsed, source_ip, datetime.now(timezone.utc))
+        # Detection failures must never lose the event: the engine already
+        # guards each rule; this guard covers engine-level errors.
+        try:
+            get_detection_engine().process(event, db)
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("Detection failed for event %s", event.id)
+            db.rollback()
+        return event
 
 
 class IngestionStats:

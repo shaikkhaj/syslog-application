@@ -37,7 +37,7 @@ def test_ingest_creates_event_device_and_interface(db_ready, db_session):
     assert event.severity_label == "info"
     assert event.facility == 16
     assert event.interface_name == "GigabitEthernet0/1"
-    assert event.event_type_code == "link_down"
+    assert event.event_type_code == "INTERFACE_DOWN"
     assert event.event_type_id is not None
     assert event.timestamp is not None
     assert "changed state to down" in event.message
@@ -82,8 +82,14 @@ def test_event_type_catalog_seeded(db_ready, db_session):
         row.code
         for row in db_session.execute(select(EventType)).scalars()
     }
-    assert {"link_down", "link_up", "bgp_down", "auth_failure", "other"} <= codes
-    assert resolver.get_id(db_session, "link_down") is not None
+    assert {
+        "INTERFACE_DOWN",
+        "INTERFACE_UP",
+        "BGP_DOWN",
+        "AUTH_FAILURE",
+        "OTHER",
+    } <= codes
+    assert resolver.get_id(db_session, "INTERFACE_DOWN") is not None
 
 
 def test_empty_message_raises(db_ready):

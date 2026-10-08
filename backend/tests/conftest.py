@@ -20,6 +20,109 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _clean_alerts():
+    """Start every test with an empty alerts table and fresh engine counters.
+
+    The SQLite test database is shared across the whole session, while alert
+    assertions are usually exact ("exactly one LINK_FLAP alert").
+    """
+    yield
+    try:
+        from sqlalchemy import delete
+
+        from app.db.session import SessionLocal
+        from app.models.models import Alert
+
+        with SessionLocal() as session:
+            session.execute(delete(Alert))
+            session.commit()
+    except Exception:  # pragma: no cover - tables may not exist yet
+        pass
+
+
+@pytest.fixture()
+def alerts_table(db_ready):
+    """Return a helper to query alerts within a test."""
+    from sqlalchemy import select
+
+    from app.db.session import SessionLocal
+    from app.models.models import Alert
+
+    class Alerts:
+        @staticmethod
+        def all():
+            with SessionLocal() as session:
+                return list(session.execute(select(Alert)).scalars())
+
+        @staticmethod
+        def by_type(code: str):
+            with SessionLocal() as session:
+                return list(
+                    session.execute(
+                        select(Alert).where(Alert.event_type == code)
+                    ).scalars()
+                )
+
+    return Alerts
+
+
+@pytest.fixture()
+def event_factory(db_ready):
+    """Insert normalized events directly (supports backdating for windows)."""
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select
+
+    from app.db.session import SessionLocal
+    from app.models.models import Device, SyslogEvent
+
+    def _create(
+        ip: str,
+        message: str,
+        *,
+        event_type: str = "OTHER",
+        hostname: str | None = None,
+        vendor: str = "linux",
+        interface: str | None = None,
+        received_at: datetime | None = None,
+        severity: int = 6,
+    ):
+        with SessionLocal() as session:
+            device = session.execute(
+                select(Device).where(Device.ip_address == ip)
+            ).scalar_one_or_none()
+            if device is None:
+                device = Device(
+                    ip_address=ip, hostname=hostname or ip, vendor=vendor
+                )
+                session.add(device)
+                session.flush()
+            event = SyslogEvent(
+                received_at=received_at or datetime.now(timezone.utc),
+                timestamp=None,
+                source_ip=ip,
+                device_id=device.id,
+                rfc="3164",
+                facility=16,
+                severity=severity,
+                severity_label="info",
+                hostname=hostname,
+                vendor=vendor,
+                interface_name=interface,
+                event_type_code=event_type,
+                message=message,
+                raw_message=message,
+            )
+            session.add(event)
+            session.commit()
+            session.refresh(event)
+            session.expunge(event)
+            return event
+
+    return _create
+
+
 @pytest.fixture(scope="session")
 def client():
     """Boot the full application (DB init + pipeline) and yield a test client."""

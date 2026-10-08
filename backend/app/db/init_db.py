@@ -35,18 +35,31 @@ def wait_for_database(max_attempts: int = _MAX_ATTEMPTS) -> bool:
 
 
 def seed_event_types(session: Session) -> None:
-    """Insert the event-type catalog rows that do not exist yet (idempotent)."""
+    """Sync the event-type catalog with the seeds (idempotent).
+
+    Adds missing codes and prunes rows that are no longer part of the
+    taxonomy (the Phase 2 rename left stale lowercase codes on pre-existing
+    development databases).
+    """
     from sqlalchemy import select
 
-    existing = {row.code for row in session.execute(select(EventType)).scalars()}
+    existing = {row.code: row for row in session.execute(select(EventType)).scalars()}
+    seed_codes = {seed["code"] for seed in EVENT_TYPE_SEEDS}
     added = 0
     for seed in EVENT_TYPE_SEEDS:
         if seed["code"] not in existing:
             session.add(EventType(**seed))
             added += 1
+    pruned = 0
+    for code, row in existing.items():
+        if code not in seed_codes:
+            session.delete(row)
+            pruned += 1
     session.commit()
     if added:
         logger.info("Seeded %s event types into the catalog", added)
+    if pruned:
+        logger.info("Pruned %s obsolete event types from the catalog", pruned)
 
 
 def init_db() -> None:

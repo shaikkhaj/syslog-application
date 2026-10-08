@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     syslog_max_message_bytes: int = 65_536
     syslog_worker_count: int = 4
 
+    # Detection engine (Phase 2) ----------------------------------------
+    detection_enabled: bool = True
+    link_flap_window_seconds: int = 300
+    link_flap_threshold: int = 4
+    auth_failure_window_seconds: int = 300
+    auth_failure_threshold: int = 5
+    cpu_high_threshold_percent: int = 90
+    memory_high_threshold_percent: int = 90
+
     def build_database_url(self) -> str:
         """Return the SQLAlchemy connection URL for PostgreSQL/SQLite."""
         if self.database_url:

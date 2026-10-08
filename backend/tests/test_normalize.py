@@ -74,7 +74,7 @@ class TestNormalize:
         assert norm.facility == 16
         assert norm.facility_name == "local0"
         assert norm.interface_name == "GigabitEthernet0/1"
-        assert norm.event_type_code == "link_down"
+        assert norm.event_type_code == "INTERFACE_DOWN"
         assert norm.received_at is not None
 
     def test_fortigate_hostname_fallback_from_devname(self):
@@ -86,19 +86,19 @@ class TestNormalize:
         assert norm.severity == 1
         assert norm.severity_label == "alert"
         assert norm.interface_name == "port1"
-        assert norm.event_type_code == "other"  # deny message: no rule matches yet
+        assert norm.event_type_code == "OTHER"  # deny message: no rule matches yet
 
     def test_auth_failure_classification(self):
         norm = normalize(parse_syslog(LINUX), "10.0.0.3")
         assert norm.vendor == "linux"
-        assert norm.event_type_code == "auth_failure"
+        assert norm.event_type_code == "AUTH_FAILURE"
 
     def test_bgp_down_classification(self):
         norm = normalize(parse_syslog(JUNIPER), "10.0.0.4")
         assert norm.vendor == "juniper"
-        assert norm.event_type_code == "bgp_down"
+        assert norm.event_type_code == "BGP_DOWN"
 
     def test_unmatched_is_other(self):
         parsed = parse_syslog(b"<14>Jan 15 10:23:45 h1: something odd happened")
         norm = normalize(parsed, "10.0.0.5")
-        assert norm.event_type_code == "other"
+        assert norm.event_type_code == "OTHER"

@@ -1,9 +1,10 @@
 """Event-type catalog: seeds, matching patterns and the resolver.
 
-Phase 1 performs simple rule-based classification at ingestion time using
-regular expressions over the normalized message. The full detection engine
-(link-flap windows, thresholds, ML anomaly scores, ...) arrives in later
-phases — the catalog table and resolver are already in place for it.
+Classification happens once, at ingestion time, using regular expressions
+over the normalized message. The canonical code list lives in
+``app.detection.types.EventType``; the detection engine's rules then consume
+these classifications to raise alerts (windows/thresholds are applied there,
+never in the catalog).
 """
 
 from __future__ import annotations
@@ -11,72 +12,99 @@ from __future__ import annotations
 import re
 import threading
 
+from app.detection.types import EventType
+
 # Order matters: the first matching entry wins, so the most specific rules
 # come first. `patterns` are compiled with re.IGNORECASE.
 EVENT_TYPE_SEEDS: list[dict] = [
     {
-        "code": "link_flap",
+        "code": EventType.LINK_FLAP.value,
         "name": "Interface Flapping",
         "category": "interface",
         "description": "Interface repeatedly transitions between up and down.",
         "patterns": [r"\bflapping\b", r"\bflap(?:ped|s)?\b"],
     },
     {
-        "code": "bgp_down",
+        "code": EventType.BGP_DOWN.value,
         "name": "BGP Session Down",
         "category": "routing",
         "description": "BGP peer reset, dropped or moved to a non-established state.",
         "patterns": [
-            r"BGP.{0,120}\b(?:reset|down|closed|ceased|notification|unusable)\b",
+            r"BGP.{0,140}\b(?:reset|down|closed|ceased|notification|unusable|error)\b",
             r"ADJCHANGE.{0,80}\bDown\b",
-            r"peer.{0,80}moved state.{0,40}to\s+(?:Idle|Active|Idle \()",
+            r"peer.{0,80}moved state.{0,40}to\s+(?:Idle|Active)",
         ],
     },
     {
-        "code": "bgp_up",
+        "code": EventType.BGP_UP.value,
         "name": "BGP Session Established",
         "category": "routing",
         "description": "BGP peer moved to the Established state.",
         "patterns": [
             r"ADJCHANGE.{0,80}\bUp\b",
-            r"BGP.{0,120}\bEstablished\b",
-            r"peer.{0,80}moved state.{0,40}to\s+Established",
+            r"BGP.{0,140}\bEstablished\b",
+            r"moved state.{0,60}to\s+Established",
         ],
     },
     {
-        "code": "ospf_neighbor_change",
-        "name": "OSPF Neighbor Change",
+        "code": EventType.OSPF_NEIGHBOR_DOWN.value,
+        "name": "OSPF Neighbor Down",
         "category": "routing",
-        "description": "OSPF neighbor state changed (down, full, adjacency issue).",
+        "description": "OSPF adjacency moved from Full to Down.",
         "patterns": [
-            r"OSPF.{0,120}neighbor.{0,120}\b(?:down|up|change|state)\b",
-            r"Neighbor.{0,80}state\s+(?:Down|Full|Init|2-Way)",
+            r"OSPF.{0,160}from\s+Full\s+to\s+Down",
+            r"Nbr.{0,80}from\s+Full\s+to\s+Down",
+            r"OSPF.{0,140}adjacency.{0,60}\b(?:down|failed)\b",
         ],
     },
     {
-        "code": "link_down",
-        "name": "Interface Link Down",
+        "code": EventType.OSPF_NEIGHBOR_UP.value,
+        "name": "OSPF Neighbor Up",
+        "category": "routing",
+        "description": "OSPF adjacency established (Down to Full).",
+        "patterns": [
+            r"OSPF.{0,160}from\s+Down\s+to\s+Full",
+            r"OSPF.{0,140}adjacency.{0,60}\b(?:up|established)\b",
+        ],
+    },
+    {
+        "code": EventType.DEVICE_UNREACHABLE.value,
+        "name": "Device / Host Unreachable",
+        "category": "system",
+        "description": "A host or network path is reported unreachable.",
+        "patterns": [
+            r"\bno route to host\b",
+            r"\bhost unreachable\b",
+            r"\b(?:network|host)\s+is\s+unreachable\b",
+            r"\bdevice unreachable\b",
+            r"\bnot\s+reachable\b",
+            r"\bpath\s+(?:expected\s+)?unreachable\b",
+        ],
+    },
+    {
+        "code": EventType.INTERFACE_DOWN.value,
+        "name": "Interface Down",
         "category": "interface",
         "description": "Interface or line protocol changed state to down.",
         "patterns": [
             r"changed state to down",
-            r"interface\s+\S+\s+is\s+down",
+            r"interface\s+[^\n]{0,60}\bis\s+down\b",
             r"\blink\s+(?:is\s+)?down\b",
         ],
     },
     {
-        "code": "link_up",
-        "name": "Interface Link Up",
+        "code": EventType.INTERFACE_UP.value,
+        "name": "Interface Up",
         "category": "interface",
         "description": "Interface or line protocol changed state to up.",
         "patterns": [
             r"changed state to up",
-            r"interface\s+\S+\s+is\s+up",
+            r"interface\s+[^\n]{0,60}\bis\s+up\b",
             r"\blink\s+(?:is\s+)?up\b",
         ],
     },
     {
-        "code": "high_cpu",
+        "code": EventType.CPU_HIGH.value,
         "name": "High CPU Utilization",
         "category": "performance",
         "description": "CPU utilization crossed the configured threshold.",
@@ -87,7 +115,7 @@ EVENT_TYPE_SEEDS: list[dict] = [
         ],
     },
     {
-        "code": "high_memory",
+        "code": EventType.MEMORY_HIGH.value,
         "name": "High Memory Utilization",
         "category": "performance",
         "description": "Memory utilization crossed the configured threshold.",
@@ -99,12 +127,12 @@ EVENT_TYPE_SEEDS: list[dict] = [
         ],
     },
     {
-        "code": "auth_failure",
+        "code": EventType.AUTH_FAILURE.value,
         "name": "Authentication Failure",
         "category": "security",
         "description": "Login or authentication failure detected.",
         "patterns": [
-            r"\blogin failed\b",
+            r"\blogin[-\s]failed\b",
             r"\bfailed password\b",
             r"\bauthentication failed\b",
             r"\bLOGIN_FAILED\b",
@@ -113,20 +141,32 @@ EVENT_TYPE_SEEDS: list[dict] = [
         ],
     },
     {
-        "code": "config_change",
+        "code": EventType.CONFIG_CHANGE.value,
         "name": "Configuration Change",
         "category": "configuration",
         "description": "Device configuration was modified or committed.",
         "patterns": [
             r"configured from",
             r"\bUI_COMMIT",
-            r"configuration\s+(?:change|updated|changed)",
-            r"\bconfig(?:uration)?\s+(?:change|updated|changed)",
+            r"configuration[^\n]{0,60}\b(?:chang|updat)",
+            r"\bconfig(?:uration)?[^\n]{0,60}\b(?:chang|updat)",
             r"\bcommit\s+(?:complete|completed|done)\b",
         ],
     },
     {
-        "code": "interface_error",
+        "code": EventType.ROUTE_CHANGE.value,
+        "name": "Route Change",
+        "category": "routing",
+        "description": "A routing table entry was added, removed or changed.",
+        "patterns": [
+            r"\bRTM_(?:NEW|DEL)\b",
+            r"%IPRT-\d+",
+            r"\broute\s+(?:add(?:ed)?|delet(?:e|ed)|chang(?:e|ed)|remov(?:e|ed)|install(?:ed)?)\b",
+            r"\bstatic route\b[^\n]{0,60}\b(?:chang|add|delet|remov)",
+        ],
+    },
+    {
+        "code": EventType.INTERFACE_ERROR.value,
         "name": "Interface Error",
         "category": "interface",
         "description": "Interface-level errors (CRC, input/output errors).",
@@ -138,7 +178,7 @@ EVENT_TYPE_SEEDS: list[dict] = [
         ],
     },
     {
-        "code": "system_restart",
+        "code": EventType.SYSTEM_RESTART.value,
         "name": "System Restart / Reload",
         "category": "system",
         "description": "Device rebooted, reloaded or restarted.",
@@ -151,7 +191,7 @@ EVENT_TYPE_SEEDS: list[dict] = [
         ],
     },
     {
-        "code": "other",
+        "code": EventType.OTHER.value,
         "name": "Other Event",
         "category": "other",
         "description": "Event did not match any specific rule.",
@@ -174,11 +214,11 @@ class EventTypeResolver:
         self._lock = threading.Lock()
 
     def resolve_code(self, message: str) -> str:
-        """Return the event type code for a message ('other' when unmatched)."""
+        """Return the event type code for a message (OTHER when unmatched)."""
         for code, pattern in self._compiled:
             if pattern.search(message):
                 return code
-        return "other"
+        return EventType.OTHER.value
 
     def get_id(self, session, code: str) -> int | None:
         """Return the catalog id for a code, loading the map once per process."""

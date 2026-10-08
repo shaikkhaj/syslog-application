@@ -46,8 +46,17 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Syslog listeners disabled by configuration")
 
+    # Real-time alert fan-out (WebSocket) runs on this loop; detection
+    # executes in worker threads and hops here via call_soon_threadsafe.
+    import asyncio
+
+    from app.realtime.broadcaster import alert_broadcaster
+
+    alert_broadcaster.bind(asyncio.get_running_loop())
+
     yield
 
+    alert_broadcaster.unbind()
     await listeners.stop_all()
     await pipeline.stop()
     logger.info("Shutdown complete")

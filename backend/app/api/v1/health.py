@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.session import get_db
+from app.realtime.broadcaster import alert_broadcaster
 from app.schemas.health import HealthResponse
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,17 @@ def health(request: Request, db: Session = Depends(get_db)) -> HealthResponse:
             "errors": listener_stats["errors"],
             "pipeline": pipeline.stats.snapshot() if pipeline else None,
         }
+
+    # Detection engine (Phase 2)
+    from app.detection.engine import get_detection_engine
+
+    engine = get_detection_engine()
+    checks["detection"] = {
+        "status": "ok" if engine.config.enabled else "disabled",
+        "rules": len(engine.rules),
+        "websocket_subscribers": alert_broadcaster.subscriber_count,
+        **engine.snapshot(),
+    }
 
     if checks["database"]["status"] != "ok":
         overall = "error"

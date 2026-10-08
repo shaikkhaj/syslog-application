@@ -1,15 +1,23 @@
-import { useCallback, useEffect, useState } from 'react';
-import { fetchEvents, fetchHealth } from '../api/client.js';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { fetchAlerts, fetchEvents, fetchHealth } from '../api/client.js';
+import AlertsPanel from '../components/AlertsPanel.jsx';
 import EventsTable from '../components/EventsTable.jsx';
 import FilterBar from '../components/FilterBar.jsx';
 import HealthCard from '../components/HealthCard.jsx';
 
 const REFRESH_INTERVAL_MS = 5000;
 
+function alertsWsUrl() {
+  const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${scheme}://${window.location.host}/api/v1/ws/alerts`;
+}
+
 export default function Dashboard() {
   const [health, setHealth] = useState(null);
   const [events, setEvents] = useState([]);
   const [total, setTotal] = useState(0);
+  const [alerts, setAlerts] = useState([]);
+  const [wsLive, setWsLive] = useState(false);
   const [filters, setFilters] = useState({
     q: '',
     severity: '',
@@ -18,6 +26,16 @@ export default function Dashboard() {
   });
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const reconnectTimer = useRef(null);
+
+  const loadAlerts = useCallback(async () => {
+    try {
+      const data = await fetchAlerts({ limit: 30 });
+      setAlerts(data.items);
+    } catch (err) {
+      setError(err.message);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -37,9 +55,52 @@ export default function Dashboard() {
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, REFRESH_INTERVAL_MS);
+    loadAlerts();
+    const timer = setInterval(() => {
+      load();
+      loadAlerts();
+    }, REFRESH_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load, loadAlerts]);
+
+  // Real-time alert stream (falls back to the polling above when offline).
+  useEffect(() => {
+    let socket;
+    let closed = false;
+
+    const connect = () => {
+      try {
+        socket = new WebSocket(alertsWsUrl());
+      } catch (err) {
+        return;
+      }
+      socket.onopen = () => setWsLive(true);
+      socket.onmessage = (message) => {
+        try {
+          const payload = JSON.parse(message.data);
+          if (payload.type === 'alert') {
+            loadAlerts();
+          }
+        } catch (err) {
+          /* ignore malformed frames */
+        }
+      };
+      socket.onclose = () => {
+        setWsLive(false);
+        if (!closed) {
+          reconnectTimer.current = setTimeout(connect, 5000);
+        }
+      };
+      socket.onerror = () => socket.close();
+    };
+
+    connect();
+    return () => {
+      closed = true;
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      if (socket) socket.close();
+    };
+  }, [loadAlerts]);
 
   const applyFilters = (nextFilters) => setFilters(nextFilters);
 
@@ -51,7 +112,7 @@ export default function Dashboard() {
             Network Syslog Monitoring
           </h1>
           <p className="text-sm text-slate-500">
-            Phase 1 — ingestion &amp; normalized event dashboard
+            Phase 2 — ingestion, detection engine &amp; real-time alerts
           </p>
         </div>
         <div className="text-right text-xs text-slate-500">
@@ -71,6 +132,15 @@ export default function Dashboard() {
 
       <div className="mb-6">
         <HealthCard health={health} />
+      </div>
+
+      <div className="mb-4">
+        <AlertsPanel
+          alerts={alerts}
+          live={wsLive}
+          onChanged={loadAlerts}
+          onError={setError}
+        />
       </div>
 
       <div className="mb-4">

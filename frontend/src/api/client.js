@@ -27,3 +27,39 @@ export function fetchEvents(params = {}) {
 export function fetchDevices() {
   return request('/v1/devices');
 }
+
+// --- Alerts (Phase 2) -----------------------------------------------------
+
+export function fetchAlerts(params = {}) {
+  const query = new URLSearchParams({ limit: '50' });
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== '' && value !== null && value !== undefined) {
+      query.set(key, String(value));
+    }
+  });
+  return request(`/v1/alerts?${query.toString()}`);
+}
+
+export async function acknowledgeAlert(id, actor = 'dashboard-user') {
+  const response = await fetch(`${API_BASE}/v1/alerts/${id}/acknowledge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actor }),
+  });
+  if (!response.ok) {
+    throw new Error(`Acknowledge failed with status ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function resolveAlert(id, actor = 'dashboard-user') {
+  const response = await fetch(`${API_BASE}/v1/alerts/${id}/resolve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actor }),
+  });
+  if (!response.ok) {
+    throw new Error(`Resolve failed with status ${response.status}`);
+  }
+  return response.json();
+}

@@ -138,9 +138,22 @@ class Incident(Base):
 
 
 class Alert(Base):
-    """Reserved for the alerting engine (later phases)."""
+    """Alerts raised by the detection engine (Phase 2).
+
+    Alerts are deduplicated through ``dedupe_key``: while an alert with the
+    same key is still open (not resolved), repeated findings coalesce into it
+    (``event_count``/``last_seen_at`` are updated instead of inserting rows).
+    ``incident_id`` stays reserved for the Phase 3 correlation engine.
+    """
 
     __tablename__ = "alerts"
+    __table_args__ = (
+        Index("ix_alerts_status", "status"),
+        Index("ix_alerts_severity", "severity"),
+        Index("ix_alerts_event_type", "event_type"),
+        Index("ix_alerts_dedupe_key", "dedupe_key"),
+        Index("ix_alerts_last_seen", "last_seen_at"),
+    )
 
     id: Mapped[int] = mapped_column(PK, primary_key=True, autoincrement=True)
     incident_id: Mapped[int | None] = mapped_column(
@@ -152,10 +165,28 @@ class Alert(Base):
     event_id: Mapped[int | None] = mapped_column(
         ForeignKey("syslog_events.id", ondelete="SET NULL"), nullable=True
     )
-    severity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    severity: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="new")
+    rule_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    dedupe_key: Mapped[str] = mapped_column(String(255), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="new")
+    context: Mapped[dict | None] = mapped_column(JSONField, nullable=True)
+    event_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    acknowledged_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    acknowledged_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
