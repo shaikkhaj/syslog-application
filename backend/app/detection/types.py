@@ -30,6 +30,7 @@ class EventType(str, Enum):
     MEMORY_HIGH = "MEMORY_HIGH"
     ROUTE_CHANGE = "ROUTE_CHANGE"
     DEVICE_UNREACHABLE = "DEVICE_UNREACHABLE"
+    VPN_DISCONNECT = "VPN_DISCONNECT"
     # Retained Phase 1 classifications without dedicated alerting rules:
     INTERFACE_ERROR = "INTERFACE_ERROR"
     SYSTEM_RESTART = "SYSTEM_RESTART"
@@ -38,6 +39,34 @@ class EventType(str, Enum):
     @classmethod
     def codes(cls) -> list[str]:
         return [member.value for member in cls]
+
+
+# Subsystem ("category") per event type — mirrors the event_types catalog
+# categories and is the single in-memory source used by correlation rules.
+EVENT_CATEGORIES: dict[str, str] = {
+    EventType.INTERFACE_DOWN.value: "interface",
+    EventType.INTERFACE_UP.value: "interface",
+    EventType.LINK_FLAP.value: "interface",
+    EventType.INTERFACE_ERROR.value: "interface",
+    EventType.BGP_DOWN.value: "routing",
+    EventType.BGP_UP.value: "routing",
+    EventType.OSPF_NEIGHBOR_DOWN.value: "routing",
+    EventType.OSPF_NEIGHBOR_UP.value: "routing",
+    EventType.ROUTE_CHANGE.value: "routing",
+    EventType.AUTH_FAILURE.value: "security",
+    EventType.CONFIG_CHANGE.value: "configuration",
+    EventType.CPU_HIGH.value: "performance",
+    EventType.MEMORY_HIGH.value: "performance",
+    EventType.DEVICE_UNREACHABLE.value: "system",
+    EventType.SYSTEM_RESTART.value: "system",
+    EventType.VPN_DISCONNECT.value: "system",
+    EventType.OTHER.value: "other",
+}
+
+
+def category_of(event_type: str) -> str:
+    """Return the subsystem category for an event type code."""
+    return EVENT_CATEGORIES.get(event_type, "other")
 
 
 class AlertSeverity(str, Enum):

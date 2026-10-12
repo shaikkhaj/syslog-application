@@ -5,68 +5,65 @@ Juniper, Linux), normalizes events into a common format, stores them in PostgreS
 in later phases — correlates them into incidents with root-cause analysis, topology-aware
 recommendations, health scoring, anomaly detection and an AI troubleshooting assistant.
 
-> **Status: Phase 2 complete** — foundation + ingestion + **detection engine**.
-> Correlation/topology, ML/AI, auth/RBAC arrive in later phases (see [Roadmap](#roadmap)).
+> **Status: Phase 3 complete** — ingestion + detection + **incident correlation**.
+> Topology, ML/AI anomaly detection, auth/RBAC arrive in later phases (see [Roadmap](#roadmap)).
 
 ---
 
-## Phase 2 architecture
+## Phase 3 architecture
 
 ```
  Devices (Cisco / FortiGate / Juniper / Linux)
         │  syslog UDP/TCP 514            (TLS 6514 reserved for a later phase)
         ▼
  ┌───────────────────────────── Backend (FastAPI) ─────────────────────────────┐
- │  SyslogListenerManager                                                     │
- │    ├── UdpSyslogTransport ─┐                                                │
- │    └── TcpSyslogTransport ─┴─► IngestionPipeline (bounded queue,            │
- │                                 N worker threads)                           │
- │        parse (RFC3164/5424/raw) ─► normalize ─► store (device + event)      │
+ │  SyslogListenerManager → IngestionPipeline → parse/normalize/store          │
  │                                      │                                      │
+ │        DetectionEngine (10 rules) ────┤ alerts (dedupe by key)               │
  │                                      ▼                                      │
- │        DetectionEngine (pluggable rule registry, per-event evaluation)      │
- │          interface_state · link_flap(window/threshold) · bgp_state          │
- │          ospf_state · route_change · auth_failure_threshold                 │
- │          performance_threshold(cpu/mem) · config_change · device_unreachable│
- │                      │  dedupe by key: repeats coalesce into one alert      │
- │                      ▼                                                      │
- │        alerts (PostgreSQL) ──► REST API ──► WebSocket fan-out ──► Dashboard  │
+ │        CorrelationEngine (7 match rules, configurable window/weights)       │
+ │          same key · device+interface · device+type · device+subsystem       │
+ │          causal chain · shared endpoint (source/destination) · cross-device │
+ │          → incidents (one active incident per correlation_key)              │
+ │          → scoring (volume/severity/frequency/device importance/type/duration)
+ │          → ranked root causes (deterministic, evidence-linked, no LLM)      │
+ │          → state machine OPEN→INVESTIGATING→ACKNOWLEDGED→RESOLVED→CLOSED    │
+ │          → timeline (creation, alerts, events, transitions, recovery)       │
  │                                                                             │
- │  REST API: /health · /events · /devices · /event-types · /alerts            │
- │  WebSocket: /api/v1/ws/alerts (real-time alert updates)                     │
+ │  REST: /health · /events · /devices · /event-types · /alerts · /incidents  │
+ │  WebSocket: /api/v1/ws/alerts (alert + incident frames)                     │
  └─────────────────────────────────────────────────────────────────────────────┘
-        │                                   │
-        ▼                                   ▼
- PostgreSQL 16 (events, devices,       React + Tailwind dashboard
- interfaces, event_types, alerts,      (health card, alerts panel with
- incidents)   + Redis                   ack/resolve, filters, live events)
+        │                                        │
+        ▼                                        ▼
+ PostgreSQL 16 (events, devices,            React dashboard: incidents panel
+ interfaces, event_types, alerts,           (score, root cause + confidence,
+ incidents, incident_alerts,                ack/resolve/close, timeline),
+ incident_events, incident_state_history)   alerts panel, live events
 ```
 
 Design notes:
 
-- **Classification once, detection many**: the `event_types` catalog tags every
-  event at ingestion with a canonical uppercase code (`INTERFACE_DOWN`,
-  `BGP_DOWN`, `AUTH_FAILURE`, `ROUTE_CHANGE`, …). Detection rules consume those
-  classifications and apply windows/thresholds — never the other way around.
-- **Pluggable rules**: new detections are added by creating a `DetectionRule`
-  subclass and appending it to `DEFAULT_RULES` (`app/detection/rules/__init__.py`)
-  — the pipeline and engine never change. A failing rule is isolated and counted;
-  it can never break ingestion.
-- **Alert dedupe**: findings carry a `dedupe_key` (type + device + interface /
-  neighbor / attacker). While an open alert with the same key exists, repeats
-  coalesce (`event_count`, `last_seen_at`) and severity only escalates; resolving
-  re-opens the key for a fresh alert.
-- **Configurable thresholds**: link-flap window/threshold, auth-failure
-  window/threshold, CPU/memory percent — all environment variables
-  (`.env`), read through `DetectionConfig`.
-- **Severities**: `INFO < LOW < MEDIUM < HIGH < CRITICAL` on alerts (distinct
-  from raw syslog severity on events).
-- **Real-time**: detection runs in worker threads and hops to the event loop via
-  a thread-safe broadcaster; `WS /api/v1/ws/alerts` pushes `created`/`updated`
-  frames. The dashboard also polls as a fallback.
-- **Transports are pluggable** — TLS (port 6514) registers in
-  `SyslogListenerManager` in a later phase (`SYSLOG_TLS_ENABLED` currently logs
-  a warning — no fake implementation).
+- **Correlation dimensions** (all weights and the time window are env-configurable):
+  identical correlation key, same device + interface, same device + event type,
+  same device + subsystem, causal chains (INTERFACE_DOWN + unreachable/route/VPN …),
+  shared endpoints (BGP neighbor / unreachable target across devices) and a
+  cross-device same-type hint that only counts together with another dimension.
+- **Duplicate-incident prevention**: a partial unique index allows at most ONE
+  active (not RESOLVED/CLOSED) incident per `correlation_key`; concurrent
+  creation races fall back to attaching the alert to the winning incident.
+- **Root-cause ranking** is deterministic: candidate causes (upstream ISP outage,
+  interface failure, BGP/OSPF peer failure, VPN, brute force, resource exhaustion,
+  config change, path reachability, route instability) are scored from the
+  incident's alert mix, ranked by confidence, and stored with their evidence.
+- **Timeline** merges state-history rows (creation/ack/resolve/close), related
+  alerts (recovery signals flagged) and the triggering syslog events, sorted
+  chronologically.
+- **Severity**: incident scale LOW < MEDIUM < HIGH < CRITICAL (alert INFO maps
+  to LOW); severity escalates as more severe alerts join.
+- **Scoring**: weighted mix of alert count, max severity, alert frequency,
+  device importance (hostname keywords), event-type weight and duration.
+- **Real-time**: correlation runs inside the ingestion worker; created/updated/
+  status-changed incident frames are broadcast on the WebSocket after commit.
 
 ---
 
@@ -92,10 +89,12 @@ log-applica/
 │   │   ├── detection/          # Phase 2: types/enums, config, engine,
 │   │   │   │                   #   alert service (dedupe), rule registry
 │   │   │   └── rules/          # interface, routing, auth, performance, system
+│   │   ├── correlation/        # Phase 3: match rules, scoring, root-cause
+│   │   │   │                   #   ranking, incident engine + lifecycle
 │   │   ├── realtime/           # thread-safe WebSocket broadcaster
 │   │   ├── services/           # persistence (upserts)
-│   │   └── api/v1/             # health, events, devices, alerts, ws routes
-│   └── tests/                  # 101 unit/integration tests
+│   │   └── api/v1/             # health, events, devices, alerts, incidents, ws
+│   └── tests/                  # 145 unit/integration tests
 ├── frontend/
 │   ├── Dockerfile              # multi-stage node build → nginx
 │   ├── nginx.conf              # /api proxy → backend:8000
@@ -251,11 +250,11 @@ Database/Redis/Syslog, and the event table fills in within ~5 seconds of sending
 
 ---
 
-## API reference (Phase 2)
+## API reference (Phase 3)
 
 | Method | Path                  | Description |
 |--------|-----------------------|-------------|
-| GET    | `/api/v1/health`      | App status, DB/Redis checks, listener + pipeline + detection counters |
+| GET    | `/api/v1/health`      | App status; DB/Redis, listener, pipeline, detection and correlation checks |
 | GET    | `/api/v1/events`      | Events with `limit, offset, severity, hostname, device_ip, event_type, rfc, q, since, until` |
 | GET    | `/api/v1/events/{id}` | Single event (404 if missing) |
 | GET    | `/api/v1/devices`     | Discovered devices with event counts |
@@ -263,8 +262,14 @@ Database/Redis/Syslog, and the event table fills in within ~5 seconds of sending
 | GET    | `/api/v1/alerts`      | Alerts with `status, severity, event_type, device_id, q, since, until, limit, offset` |
 | GET    | `/api/v1/alerts/{id}` | Alert detail + device + triggering event |
 | POST   | `/api/v1/alerts/{id}/acknowledge` | Acknowledge (`{"actor": "..."}` optional) — 409 if resolved |
-| POST   | `/api/v1/alerts/{id}/resolve`     | Resolve (`{"actor": "..."}` optional) — 409 if already resolved |
-| WS     | `/api/v1/ws/alerts`   | Real-time `{"type": "alert", "action": "created"\|"updated", "alert": {...}}` frames |
+| POST   | `/api/v1/alerts/{id}/resolve`     | Resolve — 409 if already resolved |
+| GET    | `/api/v1/incidents`   | Incidents with `status, severity, category, device_id, min_score, q, since, until` |
+| GET    | `/api/v1/incidents/{id}` | Incident detail + related alerts |
+| POST   | `/api/v1/incidents/{id}/acknowledge` | OPEN/INVESTIGATING → ACKNOWLEDGED (idempotent) |
+| POST   | `/api/v1/incidents/{id}/resolve`     | → RESOLVED (409 when already terminal) |
+| POST   | `/api/v1/incidents/{id}/close`       | RESOLVED → CLOSED (409 otherwise) |
+| GET    | `/api/v1/incidents/{id}/timeline`    | Chronological creation/alerts/events/transitions |
+| WS     | `/api/v1/ws/alerts`   | `{"type": "alert"\|"incident", "action": …}` frames |
 | GET    | `/api/docs`           | Swagger UI (also `/api/redoc`) |
 
 ---
@@ -273,15 +278,18 @@ Database/Redis/Syslog, and the event table fills in within ~5 seconds of sending
 
 | Table          | Purpose |
 |----------------|---------|
-| `event_types`  | Canonical classification taxonomy (`INTERFACE_DOWN`, `BGP_DOWN`, `AUTH_FAILURE`, …) + regex patterns, seeded/pruned at startup |
-| `devices`      | Auto-registered devices keyed by source IP (hostname, vendor, last seen) |
+| `event_types`  | Canonical classification taxonomy (incl. `VPN_DISCONNECT`) + patterns, seeded/pruned at startup |
+| `devices`      | Auto-registered devices keyed by source IP |
 | `interfaces`   | Interfaces discovered in payloads (unique per device+name) |
-| `syslog_events`| Normalized events: RFC variant, facility/severity, vendor, interface, event type, structured data |
-| `alerts`       | **Active (Phase 2)** — dedupe key, severity scale, status lifecycle (`new → acknowledged → resolved`), rule context JSON, ack/resolve audit fields; `incident_id` reserved for Phase 3 |
-| `incidents`    | Reserved for the correlation/RCA engine (later phase) |
+| `syslog_events`| Normalized events |
+| `alerts`       | Dedupe key, severity scale, status lifecycle, rule context JSON, ack/resolve audit fields |
+| `incidents`    | **Active (Phase 3)** — correlation key (+ partial unique index for one ACTIVE incident per key), FSM status, severity, score, affected devices JSON, ranked root-cause candidates JSON, confidence, ack/resolve/close audit fields |
+| `incident_alerts` | Join: alerts aggregated into an incident (unique per alert) |
+| `incident_events` | Join: syslog events related to an incident (timeline source) |
+| `incident_state_history` | Append-only audit of lifecycle transitions (timeline source) |
 
 Tables are created idempotently at startup (`Base.metadata.create_all`); Alembic
-migrations are planned for Phase 3 when the schema starts evolving.
+migrations are planned for Phase 4 when the schema starts evolving.
 
 ---
 
@@ -298,33 +306,30 @@ pytest
 Tests run against a throwaway SQLite database with listeners disabled — no Docker or
 PostgreSQL required.
 
-**Current results: `101 passed`** covering:
+**Current results: `135 passed`** covering:
 
-- `test_parser.py` — RFC3164 (Cisco/BSD, fractional seconds, year rollover), RFC5424
-  (structured data, escaped quotes, NIL fields, malformed fallback), raw FortiGate format,
-  invalid PRI, empty/invalid-UTF-8 input
-- `test_framing.py` — newline and octet-counted TCP framing, split chunks, oversize discard
-- `test_normalize.py` — vendor detection (4 vendors), interface extraction, severity/facility
-  labels, event-type classification
-- `test_ingestion.py` — end-to-end parse → normalize → store, device/interface upserts,
-  catalog seeding
-- `test_api.py` — health, event filtering (search/severity/IP/type), 404s, devices,
-  validation errors
-- `test_rules_interface.py` — INTERFACE_DOWN/UP alerts, coalescing, link-flap threshold
-  (below/at), window expiry, configurable threshold/window
-- `test_rules_routing.py` — BGP/OSPF down+up with neighbor extraction and previous-state
-  tracking (Cisco + Juniper), route-change detection and coalescing
-- `test_rules_auth.py` — threshold silence, crossing (MEDIUM), 3× escalation (HIGH),
-  per-attacker separation, window expiry, configurable window/threshold, Cisco SEC_LOGIN
-- `test_rules_performance.py` — CPU/memory threshold alerting, suppression below the
-  configured percent, unknown-percent fallback, coalescing
-- `test_rules_system.py` — config-change (Cisco/FortiGate/Linux actor extraction),
-  unreachable (CRITICAL) with target extraction and coalescing
-- `test_detection_engine.py` — taxonomy completeness, severity ordering, rule registry,
-  rule-error isolation, disabled mode, dedupe/escalation/resolution flow, stats
-- `test_alerts_api.py` — list/filter/pagination, validation 422s, detail with
-  device+event, acknowledge/resolve lifecycle (409s), health detection check,
-  **WebSocket streaming of created alerts**
+- `test_parser.py` — RFC3164/RFC5424/raw parsing, PRI edge cases, year rollover
+- `test_framing.py` — RFC 6587 newline + octet-counted framing
+- `test_normalize.py` — vendor detection, interface extraction, taxonomy
+- `test_ingestion.py` — end-to-end store, upserts, catalog seeding
+- `test_api.py` / `test_alerts_api.py` — health (incl. detection + correlation
+  checks), event/alert filtering, detail, acknowledge/resolve flows, 409s,
+  WebSocket streaming of created alerts
+- `test_rules_*.py` (5 files) — every detection rule with realistic
+  Cisco/FortiGate/Juniper/Linux samples and configurable thresholds
+- `test_detection_engine.py` — registry, error isolation, dedupe/escalation,
+  alert+incident payload chaining
+- `test_correlation_scenarios.py` — **link failure, link flap, BGP failure,
+  OSPF failure, ISP outage (2 devices, shared peer), and the requirement-8
+  multi-type example (INTERFACE_DOWN + unreachable + route + VPN = 1 incident)**
+- `test_correlation_scoring.py` — scoring factors, root-cause ranking,
+  individual correlation rules
+- `test_correlation_engine.py` — duplicate-incident prevention, time-window
+  expiry, resolved-incident re-opening, disabled mode
+- `test_incident_lifecycle.py` — state machine transitions +409-class errors,
+  history audit, timeline content/ordering, persisted key/score/root cause
+- `test_incident_api.py` — incident list/filters, detail, ack/resolve/close
+  lifecycle, timeline endpoint, **WebSocket incident frames**
 
 Inside Docker: `docker compose exec backend pytest`.
 
@@ -348,6 +353,12 @@ Inside Docker: `docker compose exec backend pytest`.
 | `LINK_FLAP_WINDOW_SECONDS` / `LINK_FLAP_THRESHOLD` | `300` / `4` | DOWN/UP transitions inside the window that raise one LINK_FLAP alert |
 | `AUTH_FAILURE_WINDOW_SECONDS` / `AUTH_FAILURE_THRESHOLD` | `300` / `5` | Failed logins per device+attacker inside the window (MEDIUM; HIGH at 3×) |
 | `CPU_HIGH_THRESHOLD_PERCENT` / `MEMORY_HIGH_THRESHOLD_PERCENT` | `90` / `90` | Utilization percent that raises/keeps a performance alert |
+| `CORRELATION_ENABLED` | `true` | Master switch for the correlation engine |
+| `CORRELATION_WINDOW_SECONDS` | `300` | Related alerts inside this window group into one incident |
+| `CORRELATION_MIN_MATCH_SCORE` | `3.0` | Summed rule weight required to join an existing incident |
+| `CORRELATION_WEIGHT_*` | see `.env.example` | Per-rule match weights (key, interface, type, subsystem, causal chain, shared endpoint, cross-device) |
+| `CORRELATION_CRITICAL_DEVICE_KEYWORDS` | `core,edge,…` | Hostname keywords that boost incident scores |
+| `CORRELATION_SCORE_*` | see `.env.example` | Incident scoring weights (alerts, severity, frequency, importance, type, duration) |
 
 ---
 
@@ -355,12 +366,13 @@ Inside Docker: `docker compose exec backend pytest`.
 
 - **Phase 1** ✅ Foundation + syslog ingestion (UDP/TCP, parsing, normalization, schema,
   APIs, dashboard, tests)
-- **Phase 2** ✅ Detection engine — classification taxonomy, 9 pluggable rules (interface,
+- **Phase 2** ✅ Detection engine — classification taxonomy, pluggable rules (interface,
   link-flap windows, BGP/OSPF state transitions, auth thresholds, config, CPU/memory,
-  route changes, unreachability), alert dedupe/lifecycle, alerts API, WebSocket push,
-  dashboard alerts panel
-- **Phase 3** Correlation + incidents — deduplication, incident lifecycle, RCA with
-  confidence, recommendations
+  route changes, unreachability, VPN), alert dedupe/lifecycle, alerts API, WebSocket push
+- **Phase 3** ✅ Correlation engine — 7 correlation rules (key/device/interface/type/
+  subsystem/causal-chain/shared-endpoint/cross-device), temporal windows, duplicate
+  prevention, incident FSM (OPEN→INVESTIGATING→ACKNOWLEDGED→RESOLVED→CLOSED), scoring,
+  ranked root causes with evidence, timeline, incidents API + WebSocket + dashboard panel
 - **Phase 4** Topology + ISP link monitoring — uptime/downtime/flap stats,
   topology-aware correlation, health scores
 - **Phase 5** Anomaly detection (scikit-learn) + alerting (email/web) + WebSocket push

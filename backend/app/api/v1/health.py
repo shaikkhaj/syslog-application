@@ -81,6 +81,17 @@ def health(request: Request, db: Session = Depends(get_db)) -> HealthResponse:
         **engine.snapshot(),
     }
 
+    # Correlation engine (Phase 3)
+    from app.correlation import get_correlation_engine
+
+    correlation = get_correlation_engine()
+    checks["correlation"] = {
+        "status": "ok" if correlation.config.enabled else "disabled",
+        "rules": len(correlation.rules),
+        "window_seconds": correlation.config.time_window_seconds,
+        **correlation.snapshot_stats(),
+    }
+
     if checks["database"]["status"] != "ok":
         overall = "error"
     elif all(check["status"] in ("ok", "disabled") for check in checks.values()):

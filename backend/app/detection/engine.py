@@ -75,6 +75,7 @@ class DetectionEngine:
 
         self._bump("events_processed")
         payloads: list[dict[str, Any]] = []
+        pending_alerts: list[Any] = []
         for rule in self.rules:
             if not rule.applies_to(event):
                 continue
@@ -85,18 +86,36 @@ class DetectionEngine:
                 logger.exception("Detection rule %s failed", rule.name)
                 continue
             for result in results:
-                payload = self._persist(result, event, db)
-                if payload is not None:
+                outcome = self._persist(result, event, db)
+                if outcome is not None:
+                    alert, payload = outcome
                     payloads.append(payload)
+                    pending_alerts.append(alert)
         if payloads:
-            db.commit()  # one commit per event, after all rules ran
+            db.commit()  # alerts durable before correlation runs
+
+        # Phase 3: correlate the committed alerts into incidents.
+        if pending_alerts:
+            try:
+                from app.correlation import get_correlation_engine
+
+                payloads.extend(
+                    get_correlation_engine().process_alerts(pending_alerts, db)
+                )
+            except Exception:  # pragma: no cover - correlation must not break ingestion
+                logger.exception("Correlation failed for event %s", event.id)
+                db.rollback()
+
+        # Broadcast only after every write is committed.
+        for payload in payloads:
+            self.broadcaster.emit(payload)
         return payloads
 
     # ------------------------------------------------------------------
 
     def _persist(
         self, result: DetectionResult, event: SyslogEvent, db: Session
-    ) -> dict[str, Any] | None:
+    ) -> tuple[Any, dict[str, Any]] | None:
         try:
             alert, created = raise_alert(db, result, event)
         except Exception:
@@ -118,8 +137,7 @@ class DetectionEngine:
             "action": action,
             "alert": _serialize_alert(alert, event),
         }
-        self.broadcaster.emit(payload)
-        return payload
+        return alert, payload
 
 
 def _serialize_alert(alert, event: SyslogEvent) -> dict[str, Any]:

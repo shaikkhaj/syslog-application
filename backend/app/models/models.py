@@ -24,6 +24,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -111,29 +112,140 @@ class Interface(Base):
 
 
 class Incident(Base):
-    """Reserved for the correlation / RCA engine (later phases)."""
+    """Correlated incident (Phase 3).
+
+    The correlation engine groups related alerts under one incident:
+
+    * ``correlation_key`` — deterministic key derived from the first alert
+      (device+interface / shared endpoint / device+subsystem / type). A partial
+      unique index enforces at most ONE active (not resolved/closed) incident
+      per key, preventing duplicate incidents for the same underlying failure.
+    * ``status`` — lifecycle state machine
+      OPEN → INVESTIGATING → ACKNOWLEDGED → RESOLVED → CLOSED.
+    * ``score`` — composite score (alert volume, severity, frequency, device
+      importance, event type, duration).
+    * ``root_cause`` / ``root_cause_candidates`` / ``confidence`` — ranked,
+      deterministic root-cause analysis (no LLM).
+    """
 
     __tablename__ = "incidents"
+    __table_args__ = (
+        Index("ix_incidents_status", "status"),
+        Index("ix_incidents_severity", "severity"),
+        Index("ix_incidents_score", "score"),
+        Index("ix_incidents_last_seen", "last_seen_at"),
+        Index(
+            "uq_incidents_active_key",
+            "correlation_key",
+            unique=True,
+            postgresql_where=text("status NOT IN ('RESOLVED', 'CLOSED')"),
+            sqlite_where=text("status NOT IN ('RESOLVED', 'CLOSED')"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(PK, primary_key=True, autoincrement=True)
+    correlation_key: Mapped[str] = mapped_column(String(255), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
-    severity: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="OPEN")
+    severity: Mapped[str] = mapped_column(String(16), nullable=False, default="LOW")
+    score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     category: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    event_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    device_id: Mapped[int | None] = mapped_column(
+        ForeignKey("devices.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    affected_devices: Mapped[list | None] = mapped_column(JSONField, nullable=True)
+    alert_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    root_cause: Mapped[str | None] = mapped_column(Text, nullable=True)
+    root_cause_candidates: Mapped[list | None] = mapped_column(JSONField, nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     first_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
     last_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
-    root_cause: Mapped[str | None] = mapped_column(Text, nullable=True)
-    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    acknowledged_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    closed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class IncidentAlert(Base):
+    """Join table: alerts aggregated into an incident (authoritative link)."""
+
+    __tablename__ = "incident_alerts"
+    __table_args__ = (
+        UniqueConstraint("incident_id", "alert_id", name="uq_incident_alert_pair"),
+        UniqueConstraint("alert_id", name="uq_incident_alert_alert"),
+        Index("ix_incident_alerts_incident", "incident_id"),
+    )
+
+    id: Mapped[int] = mapped_column(PK, primary_key=True, autoincrement=True)
+    incident_id: Mapped[int] = mapped_column(
+        ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False
+    )
+    alert_id: Mapped[int] = mapped_column(
+        ForeignKey("alerts.id", ondelete="CASCADE"), nullable=False
+    )
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class IncidentEvent(Base):
+    """Join table: syslog events related to an incident (timeline source)."""
+
+    __tablename__ = "incident_events"
+    __table_args__ = (
+        UniqueConstraint("incident_id", "event_id", name="uq_incident_event_pair"),
+        Index("ix_incident_events_incident", "incident_id"),
+    )
+
+    id: Mapped[int] = mapped_column(PK, primary_key=True, autoincrement=True)
+    incident_id: Mapped[int] = mapped_column(
+        ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False
+    )
+    event_id: Mapped[int] = mapped_column(
+        ForeignKey("syslog_events.id", ondelete="CASCADE"), nullable=False
+    )
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class IncidentStateHistory(Base):
+    """Append-only audit of incident lifecycle transitions (timeline source)."""
+
+    __tablename__ = "incident_state_history"
+    __table_args__ = (
+        Index("ix_incident_state_history_incident", "incident_id"),
+        Index("ix_incident_state_history_changed_at", "changed_at"),
+    )
+
+    id: Mapped[int] = mapped_column(PK, primary_key=True, autoincrement=True)
+    incident_id: Mapped[int] = mapped_column(
+        ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False
+    )
+    from_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    to_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    changed_by: Mapped[str] = mapped_column(
+        String(128), nullable=False, default="system"
+    )
+    note: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
     )
 
 

@@ -17,7 +17,11 @@ from app.detection.rules.base import DetectionRule
 from app.detection.rules.interface_rules import InterfaceStateRule, LinkFlapRule
 from app.detection.rules.performance_rules import PerformanceRule
 from app.detection.rules.routing_rules import BgpStateRule, OspfStateRule, RouteChangeRule
-from app.detection.rules.system_rules import ConfigChangeRule, DeviceUnreachableRule
+from app.detection.rules.system_rules import (
+    ConfigChangeRule,
+    DeviceUnreachableRule,
+    VpnStateRule,
+)
 
 DEFAULT_RULES: list[DetectionRule] = [
     InterfaceStateRule(),
@@ -29,6 +33,7 @@ DEFAULT_RULES: list[DetectionRule] = [
     PerformanceRule(),
     ConfigChangeRule(),
     DeviceUnreachableRule(),
+    VpnStateRule(),
 ]
 
 __all__ = ["DEFAULT_RULES", "DetectionRule"]

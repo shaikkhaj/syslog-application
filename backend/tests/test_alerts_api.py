@@ -120,12 +120,15 @@ def test_resolve_from_new_allowed_without_prior_ack(client, db_ready):
 
 
 def test_health_includes_detection_check(client):
+    from app.detection.rules import DEFAULT_RULES
+
     body = client.get("/api/v1/health").json()
     detection = body["checks"]["detection"]
     assert detection["status"] in ("ok", "disabled")
-    assert detection["rules"] == 9
+    assert detection["rules"] == len(DEFAULT_RULES)
     assert "alerts_created" in detection
     assert "websocket_subscribers" in detection
+    assert "correlation" in body["checks"]
 
 
 def test_websocket_streams_created_alerts(client, db_ready):

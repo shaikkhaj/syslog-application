@@ -82,6 +82,18 @@ EVENT_TYPE_SEEDS: list[dict] = [
         ],
     },
     {
+        "code": EventType.VPN_DISCONNECT.value,
+        "name": "VPN / Tunnel Down",
+        "category": "system",
+        "description": "An IPSec/VPN tunnel disconnected or went down.",
+        "patterns": [
+            r"\bipsec tunnel[^\n]{0,60}\bdown\b",
+            r"\btunnel[^\n]{0,40}\b(?:is\s+)?down\b",
+            r"\bvpn[^\n]{0,60}\b(?:disconnect|down|closed|failed)\b",
+            r"\btunnel[^\n]{0,60}\b(?:disconnect|closed)\b",
+        ],
+    },
+    {
         "code": EventType.INTERFACE_DOWN.value,
         "name": "Interface Down",
         "category": "interface",

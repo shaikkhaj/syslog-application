@@ -37,7 +37,7 @@ def test_severity_scale_is_ordered():
 
 def test_default_rule_registry():
     names = {rule.name for rule in DEFAULT_RULES}
-    assert len(DEFAULT_RULES) == 9
+    assert len(DEFAULT_RULES) == 10
     assert {
         "interface_state",
         "link_flap",
@@ -48,6 +48,7 @@ def test_default_rule_registry():
         "performance_threshold",
         "config_change",
         "device_unreachable",
+        "vpn_state",
     } <= names
 
 
@@ -92,9 +93,14 @@ def test_engine_creates_alert_with_default_rules(db_ready, event_factory):
     with SessionLocal() as db:
         payloads = engine.process(event, db)
 
-    assert len(payloads) == 1
-    assert payloads[0]["action"] == "created"
-    assert payloads[0]["alert"]["event_type"] == "INTERFACE_DOWN"
+    alert_payloads = [p for p in payloads if p["type"] == "alert"]
+    incident_payloads = [p for p in payloads if p["type"] == "incident"]
+    assert len(alert_payloads) == 1
+    assert alert_payloads[0]["action"] == "created"
+    assert alert_payloads[0]["alert"]["event_type"] == "INTERFACE_DOWN"
+    # Phase 3: the alert is correlated into an incident in the same pass.
+    assert len(incident_payloads) == 1
+    assert incident_payloads[0]["action"] == "created"
     assert engine.stats.alerts_created == 1
     assert engine.stats.alerts_updated == 0
 

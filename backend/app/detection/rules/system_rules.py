@@ -81,3 +81,35 @@ class DeviceUnreachableRule(DetectionRule):
             context={"target": target, "vendor": event.vendor},
             rule_name=self.name,
         )
+
+
+_TUNNEL_EXTRACTORS = [
+    re.compile(r'tunnel="([^"]+)"', re.IGNORECASE),  # FortiGate
+    re.compile(r"\btunnel\s+([\w.-]+)", re.IGNORECASE),
+]
+
+
+class VpnStateRule(DetectionRule):
+    """VPN/IPSec tunnel disconnect alerts (feeds incident correlation)."""
+
+    name = "vpn_state"
+    event_types = frozenset({EventType.VPN_DISCONNECT})
+
+    def evaluate(self, event: SyslogEvent, db: Session, config: DetectionConfig):
+        tunnel = _first(_TUNNEL_EXTRACTORS, event.message)
+        host = self._host(event)
+        yield DetectionResult(
+            event_type=EventType.VPN_DISCONNECT,
+            severity=AlertSeverity.HIGH,
+            title=(
+                f"VPN tunnel {tunnel} is DOWN on {host}"
+                if tunnel
+                else f"VPN tunnel down on {host}"
+            ),
+            message=event.message,
+            dedupe_key=(
+                f"VPN_DISCONNECT:{self._device_part(event)}:{tunnel or 'unknown'}"
+            ),
+            context={"tunnel": tunnel, "vendor": event.vendor},
+            rule_name=self.name,
+        )

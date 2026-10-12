@@ -22,20 +22,30 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _clean_alerts():
-    """Start every test with an empty alerts table and fresh engine counters.
+    """Start every test with clean alerts/incidents tables.
 
     The SQLite test database is shared across the whole session, while alert
-    assertions are usually exact ("exactly one LINK_FLAP alert").
+    and incident assertions are usually exact ("exactly one incident").
     """
     yield
     try:
         from sqlalchemy import delete
 
         from app.db.session import SessionLocal
-        from app.models.models import Alert
+        from app.models.models import (
+            Alert,
+            Incident,
+            IncidentAlert,
+            IncidentEvent,
+            IncidentStateHistory,
+        )
 
         with SessionLocal() as session:
+            session.execute(delete(IncidentStateHistory))
+            session.execute(delete(IncidentEvent))
+            session.execute(delete(IncidentAlert))
             session.execute(delete(Alert))
+            session.execute(delete(Incident))
             session.commit()
     except Exception:  # pragma: no cover - tables may not exist yet
         pass

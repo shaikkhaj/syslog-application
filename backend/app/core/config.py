@@ -58,6 +58,27 @@ class Settings(BaseSettings):
     cpu_high_threshold_percent: int = 90
     memory_high_threshold_percent: int = 90
 
+    # Correlation engine (Phase 3) ---------------------------------------
+    correlation_enabled: bool = True
+    correlation_window_seconds: int = 300
+    correlation_min_match_score: float = 3.0
+    correlation_weight_same_key: float = 5.0
+    correlation_weight_same_device_interface: float = 4.0
+    correlation_weight_same_device_event_type: float = 3.5
+    correlation_weight_same_device_subsystem: float = 3.0
+    correlation_weight_causal_chain: float = 3.0
+    correlation_weight_shared_endpoint: float = 3.5
+    correlation_weight_cross_device_same_type: float = 2.0
+    correlation_critical_device_keywords: str = (
+        "core,edge,aggregation,gateway,firewall,router,rtr"
+    )
+    correlation_score_alert_weight: float = 3.0
+    correlation_score_severity_weight: float = 10.0
+    correlation_score_frequency_weight: float = 4.0
+    correlation_score_device_importance_weight: float = 15.0
+    correlation_score_event_type_weight: float = 8.0
+    correlation_score_duration_weight: float = 0.2
+
     def build_database_url(self) -> str:
         """Return the SQLAlchemy connection URL for PostgreSQL/SQLite."""
         if self.database_url:

@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchAlerts, fetchEvents, fetchHealth } from '../api/client.js';
+import {
+  fetchAlerts,
+  fetchEvents,
+  fetchHealth,
+  fetchIncidents,
+} from '../api/client.js';
 import AlertsPanel from '../components/AlertsPanel.jsx';
 import EventsTable from '../components/EventsTable.jsx';
 import FilterBar from '../components/FilterBar.jsx';
 import HealthCard from '../components/HealthCard.jsx';
+import IncidentsPanel from '../components/IncidentsPanel.jsx';
 
 const REFRESH_INTERVAL_MS = 5000;
 
@@ -17,6 +23,7 @@ export default function Dashboard() {
   const [events, setEvents] = useState([]);
   const [total, setTotal] = useState(0);
   const [alerts, setAlerts] = useState([]);
+  const [incidents, setIncidents] = useState([]);
   const [wsLive, setWsLive] = useState(false);
   const [filters, setFilters] = useState({
     q: '',
@@ -32,6 +39,15 @@ export default function Dashboard() {
     try {
       const data = await fetchAlerts({ limit: 30 });
       setAlerts(data.items);
+    } catch (err) {
+      setError(err.message);
+    }
+  }, []);
+
+  const loadIncidents = useCallback(async () => {
+    try {
+      const data = await fetchIncidents({ limit: 30 });
+      setIncidents(data.items);
     } catch (err) {
       setError(err.message);
     }
@@ -56,12 +72,14 @@ export default function Dashboard() {
   useEffect(() => {
     load();
     loadAlerts();
+    loadIncidents();
     const timer = setInterval(() => {
       load();
       loadAlerts();
+      loadIncidents();
     }, REFRESH_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [load, loadAlerts]);
+  }, [load, loadAlerts, loadIncidents]);
 
   // Real-time alert stream (falls back to the polling above when offline).
   useEffect(() => {
@@ -80,6 +98,8 @@ export default function Dashboard() {
           const payload = JSON.parse(message.data);
           if (payload.type === 'alert') {
             loadAlerts();
+          } else if (payload.type === 'incident') {
+            loadIncidents();
           }
         } catch (err) {
           /* ignore malformed frames */
@@ -100,7 +120,7 @@ export default function Dashboard() {
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       if (socket) socket.close();
     };
-  }, [loadAlerts]);
+  }, [loadAlerts, loadIncidents]);
 
   const applyFilters = (nextFilters) => setFilters(nextFilters);
 
@@ -132,6 +152,15 @@ export default function Dashboard() {
 
       <div className="mb-6">
         <HealthCard health={health} />
+      </div>
+
+      <div className="mb-4">
+        <IncidentsPanel
+          incidents={incidents}
+          live={wsLive}
+          onChanged={loadIncidents}
+          onError={setError}
+        />
       </div>
 
       <div className="mb-4">

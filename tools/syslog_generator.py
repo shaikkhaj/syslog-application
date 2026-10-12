@@ -80,6 +80,9 @@ def fortigate_messages(now: datetime) -> list[str]:
         f'<186>{ts} devname="FGT60F-001" devid="FG60F000000001" logid="0100030001" '
         f'type="event" subtype="router" level="notice" msg="static route '
         f'10.20.0.0/24 changed via 10.10.5.1"',
+        f'<186>{ts} devname="FGT60F-001" devid="FG60F000000001" logid="0100020004" '
+        f'type="event" subtype="ipsec" level="error" tunnel="FGT-to-DC" '
+        f'msg="IPSec tunnel is down"',
     ]
 
 
