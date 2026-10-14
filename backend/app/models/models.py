@@ -66,6 +66,9 @@ class Device(Base):
     hostname: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ip_address: Mapped[str] = mapped_column(String(45), nullable=False)
     vendor: Mapped[str] = mapped_column(String(64), nullable=False, default="unknown")
+    # Topology node type: router | switch | firewall | server (Phase 4).
+    # Nullable only for legacy rows created before the ALTER migration.
+    device_type: Mapped[str | None] = mapped_column(String(32), default="router")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
     first_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
@@ -174,6 +177,45 @@ class Incident(Base):
     closed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class TopologyLink(Base):
+    """Interface-to-interface connection between two devices (Phase 4).
+
+    Endpoints are stored as interface *names* (strings) because interfaces
+    are often discovered from syslog only after the link is registered.
+    Links are treated as undirected by the topology visualisation.
+    """
+
+    __tablename__ = "topology_links"
+    __table_args__ = (
+        UniqueConstraint(
+            "source_device_id",
+            "source_interface",
+            "target_device_id",
+            "target_interface",
+            name="uq_topology_link_ends",
+        ),
+        Index("ix_topology_links_source", "source_device_id"),
+        Index("ix_topology_links_target", "target_device_id"),
+    )
+
+    id: Mapped[int] = mapped_column(PK, primary_key=True, autoincrement=True)
+    source_device_id: Mapped[int] = mapped_column(
+        ForeignKey("devices.id", ondelete="CASCADE"), nullable=False
+    )
+    source_interface: Mapped[str] = mapped_column(String(128), nullable=False)
+    target_device_id: Mapped[int] = mapped_column(
+        ForeignKey("devices.id", ondelete="CASCADE"), nullable=False
+    )
+    target_interface: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="up")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )

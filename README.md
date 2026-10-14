@@ -5,12 +5,12 @@ Juniper, Linux), normalizes events into a common format, stores them in PostgreS
 in later phases — correlates them into incidents with root-cause analysis, topology-aware
 recommendations, health scoring, anomaly detection and an AI troubleshooting assistant.
 
-> **Status: Phase 3 complete** — ingestion + detection + **incident correlation**.
-> Topology, ML/AI anomaly detection, auth/RBAC arrive in later phases (see [Roadmap](#roadmap)).
+> **Status: Phase 4 complete** — ingestion + detection + incident correlation + **network topology**.
+> ML/AI anomaly detection and auth/RBAC arrive in later phases (see [Roadmap](#roadmap)).
 
 ---
 
-## Phase 3 architecture
+## Phase 4 architecture
 
 ```
  Devices (Cisco / FortiGate / Juniper / Linux)
@@ -29,8 +29,12 @@ recommendations, health scoring, anomaly detection and an AI troubleshooting ass
  │          → ranked root causes (deterministic, evidence-linked, no LLM)      │
  │          → state machine OPEN→INVESTIGATING→ACKNOWLEDGED→RESOLVED→CLOSED    │
  │          → timeline (creation, alerts, events, transitions, recovery)       │
+ │  │                                                                          │
+ │  │  Topology: devices + interface links → GET /topology (nodes/links)       │
+ │  │  highlighted from open alerts + active incidents (max severity/node)     │
+ │  │  device CRUD + link CRUD (interface-to-interface)                        │
  │                                                                             │
- │  REST: /health · /events · /devices · /event-types · /alerts · /incidents  │
+ │  REST: /health · /events · /devices · /alerts · /incidents · /topology      │
  │  WebSocket: /api/v1/ws/alerts (alert + incident frames)                     │
  └─────────────────────────────────────────────────────────────────────────────┘
         │                                        │
@@ -38,7 +42,8 @@ recommendations, health scoring, anomaly detection and an AI troubleshooting ass
  PostgreSQL 16 (events, devices,            React dashboard: incidents panel
  interfaces, event_types, alerts,           (score, root cause + confidence,
  incidents, incident_alerts,                ack/resolve/close, timeline),
- incident_events, incident_state_history)   alerts panel, live events
+ incident_events, incident_state_history,   alerts panel, live events,
+ topology_links)                            interactive topology map
 ```
 
 Design notes:
@@ -58,6 +63,13 @@ Design notes:
 - **Timeline** merges state-history rows (creation/ack/resolve/close), related
   alerts (recovery signals flagged) and the triggering syslog events, sorted
   chronologically.
+- **Topology highlighting** is derived, not stored: `GET /api/v1/topology` marks
+  nodes with open alerts or active incidents as `affected` and computes the
+  maximum severity for colouring; links inherit severity from an endpoint in an
+  active incident, an endpoint with open alerts, or an alert whose
+  `context.interface` matches one of the link's interface names. Devices carry a
+  `device_type` (router/switch/firewall/server) and links are explicit
+  interface-to-interface rows (`topology_links`).
 - **Severity**: incident scale LOW < MEDIUM < HIGH < CRITICAL (alert INFO maps
   to LOW); severity escalates as more severe alerts join.
 - **Scoring**: weighted mix of alert count, max severity, alert frequency,
@@ -82,7 +94,7 @@ log-applica/
 │   │   ├── core/               # config (pydantic-settings), logging
 │   │   ├── db/                 # engine/session, init_db (retry + seed)
 │   │   ├── models/             # event_types, devices, interfaces,
-│   │   │                       # syslog_events, incidents, alerts
+│   │   │                       # syslog_events, incidents, alerts, topology_links
 │   │   ├── schemas/            # Pydantic response models
 │   │   ├── syslog/             # parser, normalize, framing, listeners,
 │   │   │                       # event-type catalog, pipeline
@@ -93,8 +105,8 @@ log-applica/
 │   │   │   │                   #   ranking, incident engine + lifecycle
 │   │   ├── realtime/           # thread-safe WebSocket broadcaster
 │   │   ├── services/           # persistence (upserts)
-│   │   └── api/v1/             # health, events, devices, alerts, incidents, ws
-│   └── tests/                  # 145 unit/integration tests
+│   │   └── api/v1/             # health, events, devices, alerts, incidents, topology, ws
+│   └── tests/                  # 147 unit/integration tests
 ├── frontend/
 │   ├── Dockerfile              # multi-stage node build → nginx
 │   ├── nginx.conf              # /api proxy → backend:8000
@@ -250,7 +262,7 @@ Database/Redis/Syslog, and the event table fills in within ~5 seconds of sending
 
 ---
 
-## API reference (Phase 3)
+## API reference (Phase 4)
 
 | Method | Path                  | Description |
 |--------|-----------------------|-------------|
@@ -258,6 +270,9 @@ Database/Redis/Syslog, and the event table fills in within ~5 seconds of sending
 | GET    | `/api/v1/events`      | Events with `limit, offset, severity, hostname, device_ip, event_type, rfc, q, since, until` |
 | GET    | `/api/v1/events/{id}` | Single event (404 if missing) |
 | GET    | `/api/v1/devices`     | Discovered devices with event counts |
+| POST   | `/api/v1/devices`     | Create a device (`hostname, ip_address, device_type, status, vendor`) |
+| PATCH  | `/api/v1/devices/{id}`| Edit a device |
+| DELETE | `/api/v1/devices/{id}`| Delete a device (204) |
 | GET    | `/api/v1/event-types` | Event type catalog |
 | GET    | `/api/v1/alerts`      | Alerts with `status, severity, event_type, device_id, q, since, until, limit, offset` |
 | GET    | `/api/v1/alerts/{id}` | Alert detail + device + triggering event |
@@ -269,6 +284,10 @@ Database/Redis/Syslog, and the event table fills in within ~5 seconds of sending
 | POST   | `/api/v1/incidents/{id}/resolve`     | → RESOLVED (409 when already terminal) |
 | POST   | `/api/v1/incidents/{id}/close`       | RESOLVED → CLOSED (409 otherwise) |
 | GET    | `/api/v1/incidents/{id}/timeline`    | Chronological creation/alerts/events/transitions |
+| GET    | `/api/v1/topology`   | Topology graph — nodes (devices + alert/incident highlighting) and links |
+| POST   | `/api/v1/links`      | Create an interface-to-interface link (201) |
+| PATCH  | `/api/v1/links/{id}` | Edit a link |
+| DELETE | `/api/v1/links/{id}` | Delete a link (204) |
 | WS     | `/api/v1/ws/alerts`   | `{"type": "alert"\|"incident", "action": …}` frames |
 | GET    | `/api/docs`           | Swagger UI (also `/api/redoc`) |
 
@@ -279,8 +298,9 @@ Database/Redis/Syslog, and the event table fills in within ~5 seconds of sending
 | Table          | Purpose |
 |----------------|---------|
 | `event_types`  | Canonical classification taxonomy (incl. `VPN_DISCONNECT`) + patterns, seeded/pruned at startup |
-| `devices`      | Auto-registered devices keyed by source IP |
+| `devices`      | Auto-registered devices keyed by source IP (+ `device_type` router/switch/firewall/server for topology) |
 | `interfaces`   | Interfaces discovered in payloads (unique per device+name) |
+| `topology_links` | **Phase 4** — interface-to-interface links between devices (status up/down; unique per endpoint pair, endpoint order-insensitive) |
 | `syslog_events`| Normalized events |
 | `alerts`       | Dedupe key, severity scale, status lifecycle, rule context JSON, ack/resolve audit fields |
 | `incidents`    | **Active (Phase 3)** — correlation key (+ partial unique index for one ACTIVE incident per key), FSM status, severity, score, affected devices JSON, ranked root-cause candidates JSON, confidence, ack/resolve/close audit fields |
@@ -289,7 +309,8 @@ Database/Redis/Syslog, and the event table fills in within ~5 seconds of sending
 | `incident_state_history` | Append-only audit of lifecycle transitions (timeline source) |
 
 Tables are created idempotently at startup (`Base.metadata.create_all`); Alembic
-migrations are planned for Phase 4 when the schema starts evolving.
+migrations are planned for a later phase — Phase 4's `device_type` column and
+`topology_links` table ship as an idempotent ALTER shim in `init_db.py`.
 
 ---
 
@@ -306,7 +327,7 @@ pytest
 Tests run against a throwaway SQLite database with listeners disabled — no Docker or
 PostgreSQL required.
 
-**Current results: `135 passed`** covering:
+**Current results: `147 passed`** covering:
 
 - `test_parser.py` — RFC3164/RFC5424/raw parsing, PRI edge cases, year rollover
 - `test_framing.py` — RFC 6587 newline + octet-counted framing
@@ -330,6 +351,8 @@ PostgreSQL required.
   history audit, timeline content/ordering, persisted key/score/root cause
 - `test_incident_api.py` — incident list/filters, detail, ack/resolve/close
   lifecycle, timeline endpoint, **WebSocket incident frames**
+- `test_topology.py` — topology graph + open-alert/active-incident highlighting,
+  device CRUD, link CRUD (12 tests)
 
 Inside Docker: `docker compose exec backend pytest`.
 
@@ -373,8 +396,10 @@ Inside Docker: `docker compose exec backend pytest`.
   subsystem/causal-chain/shared-endpoint/cross-device), temporal windows, duplicate
   prevention, incident FSM (OPEN→INVESTIGATING→ACKNOWLEDGED→RESOLVED→CLOSED), scoring,
   ranked root causes with evidence, timeline, incidents API + WebSocket + dashboard panel
-- **Phase 4** Topology + ISP link monitoring — uptime/downtime/flap stats,
-  topology-aware correlation, health scores
+- **Phase 4** ✅ Network topology — device/link models + CRUD, topology graph API
+  with alert/incident highlighting, interactive SVG topology dashboard; ISP link
+  uptime/downtime/flap stats, topology-aware correlation and health scores remain
+  open for a later phase
 - **Phase 5** Anomaly detection (scikit-learn) + alerting (email/web) + WebSocket push
 - **Phase 6** Auth/RBAC/audit logs, reports & export, AI troubleshooting assistant
 - TLS syslog transport (6514) and Alembic migrations — slotted into the phase where first

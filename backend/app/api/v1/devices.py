@@ -2,13 +2,22 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models.models import Device, EventType, SyslogEvent
+from app.models.models import (
+    Alert,
+    Device,
+    EventType,
+    Incident,
+    Interface,
+    SyslogEvent,
+    TopologyLink,
+)
 from app.schemas.event import DeviceListResponse, DeviceOut, EventTypeOut
+from app.schemas.topology import DeviceCreate, DeviceUpdate
 
 router = APIRouter(tags=["devices"])
 
@@ -53,6 +62,89 @@ def list_devices(
         for device, event_count in rows
     ]
     return DeviceListResponse(items=items, total=total)
+
+
+# ---------------------------------------------------------------------------
+# Device CRUD (Phase 4)
+# ---------------------------------------------------------------------------
+
+def _device_out(db: Session, device: Device) -> DeviceOut:
+    count = db.execute(
+        select(func.count())
+        .select_from(SyslogEvent)
+        .where(SyslogEvent.device_id == device.id)
+    ).scalar_one()
+    return DeviceOut(
+        id=device.id,
+        hostname=device.hostname,
+        ip_address=device.ip_address,
+        vendor=device.vendor,
+        device_type=device.device_type or "router",
+        status=device.status,
+        first_seen_at=device.first_seen_at,
+        last_seen_at=device.last_seen_at,
+        event_count=int(count),
+    )
+
+
+@router.post(
+    "/devices",
+    response_model=DeviceOut,
+    status_code=201,
+    summary="Add a topology device",
+)
+def create_device(payload: DeviceCreate, db: Session = Depends(get_db)) -> DeviceOut:
+    if db.execute(
+        select(Device).where(Device.ip_address == payload.ip_address)
+    ).scalar_one_or_none():
+        raise HTTPException(
+            status_code=409, detail=f"Device with IP {payload.ip_address} already exists"
+        )
+    device = Device(
+        hostname=payload.hostname,
+        ip_address=payload.ip_address,
+        vendor=payload.vendor,
+        device_type=payload.device_type,
+        status=payload.status,
+    )
+    db.add(device)
+    db.commit()
+    db.refresh(device)
+    return _device_out(db, device)
+
+
+@router.patch("/devices/{device_id}", response_model=DeviceOut, summary="Edit a device")
+def update_device(
+    device_id: int, payload: DeviceUpdate, db: Session = Depends(get_db)
+) -> DeviceOut:
+    device = db.get(Device, device_id)
+    if device is None:
+        raise HTTPException(status_code=404, detail="Device not found")
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        if value is not None:
+            setattr(device, key, value)
+    db.commit()
+    db.refresh(device)
+    return _device_out(db, device)
+
+
+@router.delete("/devices/{device_id}", status_code=204, summary="Delete a device")
+def delete_device(device_id: int, db: Session = Depends(get_db)):
+    device = db.get(Device, device_id)
+    if device is None:
+        raise HTTPException(status_code=404, detail="Device not found")
+    # Explicit cleanup: SQLite does not enforce ON DELETE side effects.
+    db.execute(update(Alert).where(Alert.device_id == device_id).values(device_id=None))
+    db.execute(
+        update(Incident).where(Incident.device_id == device_id).values(device_id=None)
+    )
+    db.execute(delete(TopologyLink).where(
+        (TopologyLink.source_device_id == device_id)
+        | (TopologyLink.target_device_id == device_id)
+    ))
+    db.execute(delete(Interface).where(Interface.device_id == device_id))
+    db.delete(device)
+    db.commit()
 
 
 @router.get(

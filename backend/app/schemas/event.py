@@ -45,6 +45,7 @@ class DeviceOut(BaseModel):
     hostname: str | None = None
     ip_address: str
     vendor: str
+    device_type: str | None = "router"
     status: str
     first_seen_at: datetime
     last_seen_at: datetime

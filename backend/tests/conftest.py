@@ -46,6 +46,9 @@ def _clean_alerts():
             session.execute(delete(IncidentAlert))
             session.execute(delete(Alert))
             session.execute(delete(Incident))
+            from app.models.models import TopologyLink
+
+            session.execute(delete(TopologyLink))
             session.commit()
     except Exception:  # pragma: no cover - tables may not exist yet
         pass

@@ -62,6 +62,25 @@ def seed_event_types(session: Session) -> None:
         logger.info("Pruned %s obsolete event types from the catalog", pruned)
 
 
+def _migrate_missing_columns() -> None:
+    """Best-effort column migrations for databases created before Phase 4."""
+    from sqlalchemy import inspect as sa_inspect
+
+    inspector = sa_inspect(engine)
+    if "devices" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("devices")}
+    if "device_type" not in columns:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE devices ADD COLUMN device_type VARCHAR(32) "
+                    "DEFAULT 'router'"
+                )
+            )
+        logger.info("Migrated devices table: added device_type column")
+
+
 def init_db() -> None:
     """Full startup initialisation. Safe to run repeatedly."""
     if not wait_for_database():
@@ -70,6 +89,7 @@ def init_db() -> None:
             f"{_MAX_ATTEMPTS} attempts — aborting startup"
         )
     Base.metadata.create_all(bind=engine)
+    _migrate_missing_columns()
     with SessionLocal() as session:
         seed_event_types(session)
     logger.info("Database initialised (tables created, event types seeded)")

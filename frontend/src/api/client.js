@@ -106,3 +106,48 @@ export function resolveIncident(id, actor) {
 export function closeIncident(id, actor) {
   return incidentAction(id, 'close', actor);
 }
+
+// --- Topology (Phase 4) --------------------------------------------------
+
+export function fetchTopology() {
+  return request('/v1/topology');
+}
+
+async function deviceMutation(path, method, payload) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const detail = await response
+      .json()
+      .catch(() => ({ detail: `status ${response.status}` }));
+    throw new Error(detail.detail || `${method} failed`);
+  }
+  return response.status === 204 ? null : response.json();
+}
+
+export function createDevice(payload) {
+  return deviceMutation('/v1/devices', 'POST', payload);
+}
+
+export function updateDevice(id, payload) {
+  return deviceMutation(`/v1/devices/${id}`, 'PATCH', payload);
+}
+
+export function deleteDevice(id) {
+  return deviceMutation(`/v1/devices/${id}`, 'DELETE', null);
+}
+
+export function createLink(payload) {
+  return deviceMutation('/v1/links', 'POST', payload);
+}
+
+export function updateLink(id, payload) {
+  return deviceMutation(`/v1/links/${id}`, 'PATCH', payload);
+}
+
+export function deleteLink(id) {
+  return deviceMutation(`/v1/links/${id}`, 'DELETE', null);
+}
