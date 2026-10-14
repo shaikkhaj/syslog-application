@@ -5,12 +5,12 @@ Juniper, Linux), normalizes events into a common format, stores them in PostgreS
 in later phases — correlates them into incidents with root-cause analysis, topology-aware
 recommendations, health scoring, anomaly detection and an AI troubleshooting assistant.
 
-> **Status: Phase 4 complete** — ingestion + detection + incident correlation + **network topology**.
+> **Status: Phase 5 complete** — ingestion + detection + incident correlation + network topology + **advanced RCA & network health**.
 > ML/AI anomaly detection and auth/RBAC arrive in later phases (see [Roadmap](#roadmap)).
 
 ---
 
-## Phase 4 architecture
+## Phase 5 architecture
 
 ```
  Devices (Cisco / FortiGate / Juniper / Linux)
@@ -33,6 +33,8 @@ recommendations, health scoring, anomaly detection and an AI troubleshooting ass
  │  │  Topology: devices + interface links → GET /topology (nodes/links)       │
  │  │  highlighted from open alerts + active incidents (max severity/node)     │
  │  │  device CRUD + link CRUD (interface-to-interface)                        │
+ │  │  Health: GET /network-health → 0–100 score/band per device + overall     │
+ │  │  RCA: GET /incidents/{id}/rca → culprit ranking + upstream dependencies  │
  │                                                                             │
  │  REST: /health · /events · /devices · /alerts · /incidents · /topology      │
  │  WebSocket: /api/v1/ws/alerts (alert + incident frames)                     │
@@ -43,7 +45,7 @@ recommendations, health scoring, anomaly detection and an AI troubleshooting ass
  interfaces, event_types, alerts,           (score, root cause + confidence,
  incidents, incident_alerts,                ack/resolve/close, timeline),
  incident_events, incident_state_history,   alerts panel, live events,
- topology_links)                            interactive topology map
+ topology_links)                            interactive topology map, RCA/health panels
 ```
 
 Design notes:
@@ -76,6 +78,13 @@ Design notes:
   device importance (hostname keywords), event-type weight and duration.
 - **Real-time**: correlation runs inside the ingestion worker; created/updated/
   status-changed incident frames are broadcast on the WebSocket after commit.
+- **Network health & RCA (Phase 5)**: device scores (0–100, banded
+  healthy/degraded/critical) are derived at query time from open alerts, active
+  incidents, recent-event volume and device status — nothing is stored. The RCA
+  endpoint reuses Phase 3 root-cause candidates, ranks culprit devices with
+  fixed explainable bonuses (severity, primary-failure vs consequence, topology
+  adjacency, incident-primary, criticality) and walks upstream dependencies
+  toward the core (BFS, ≤3 hops, only to devices one tier closer to the core).
 
 ---
 
@@ -103,10 +112,12 @@ log-applica/
 │   │   │   └── rules/          # interface, routing, auth, performance, system
 │   │   ├── correlation/        # Phase 3: match rules, scoring, root-cause
 │   │   │   │                   #   ranking, incident engine + lifecycle
+│   │   ├── health/             # Phase 5: health scoring, shared queries,
+│   │   │   │                   #   RCA ranking + upstream dependencies
 │   │   ├── realtime/           # thread-safe WebSocket broadcaster
 │   │   ├── services/           # persistence (upserts)
-│   │   └── api/v1/             # health, events, devices, alerts, incidents, topology, ws
-│   └── tests/                  # 147 unit/integration tests
+│   │   └── api/v1/             # health, events, devices, alerts, incidents, topology, network-health, ws
+│   └── tests/                  # 168 unit/integration tests
 ├── frontend/
 │   ├── Dockerfile              # multi-stage node build → nginx
 │   ├── nginx.conf              # /api proxy → backend:8000
@@ -262,7 +273,7 @@ Database/Redis/Syslog, and the event table fills in within ~5 seconds of sending
 
 ---
 
-## API reference (Phase 4)
+## API reference (Phase 5)
 
 | Method | Path                  | Description |
 |--------|-----------------------|-------------|
@@ -284,7 +295,9 @@ Database/Redis/Syslog, and the event table fills in within ~5 seconds of sending
 | POST   | `/api/v1/incidents/{id}/resolve`     | → RESOLVED (409 when already terminal) |
 | POST   | `/api/v1/incidents/{id}/close`       | RESOLVED → CLOSED (409 otherwise) |
 | GET    | `/api/v1/incidents/{id}/timeline`    | Chronological creation/alerts/events/transitions |
+| GET    | `/api/v1/incidents/{id}/rca` | RCA report — ranked culprit devices with reasons, candidate causes, upstream dependencies |
 | GET    | `/api/v1/topology`   | Topology graph — nodes (devices + alert/incident highlighting) and links |
+| GET    | `/api/v1/network-health` | Device health scores (0–100 + band) and overall network score (`limit`, `device_id`) |
 | POST   | `/api/v1/links`      | Create an interface-to-interface link (201) |
 | PATCH  | `/api/v1/links/{id}` | Edit a link |
 | DELETE | `/api/v1/links/{id}` | Delete a link (204) |
@@ -327,7 +340,7 @@ pytest
 Tests run against a throwaway SQLite database with listeners disabled — no Docker or
 PostgreSQL required.
 
-**Current results: `147 passed`** covering:
+**Current results: `168 passed`** covering:
 
 - `test_parser.py` — RFC3164/RFC5424/raw parsing, PRI edge cases, year rollover
 - `test_framing.py` — RFC 6587 newline + octet-counted framing
@@ -353,6 +366,8 @@ PostgreSQL required.
   lifecycle, timeline endpoint, **WebSocket incident frames**
 - `test_topology.py` — topology graph + open-alert/active-incident highlighting,
   device CRUD, link CRUD (12 tests)
+- `test_network_health.py` — health scoring bands, RCA device ranking,
+  RCA + network-health API responses (21 tests)
 
 Inside Docker: `docker compose exec backend pytest`.
 
@@ -398,10 +413,14 @@ Inside Docker: `docker compose exec backend pytest`.
   ranked root causes with evidence, timeline, incidents API + WebSocket + dashboard panel
 - **Phase 4** ✅ Network topology — device/link models + CRUD, topology graph API
   with alert/incident highlighting, interactive SVG topology dashboard; ISP link
-  uptime/downtime/flap stats, topology-aware correlation and health scores remain
-  open for a later phase
-- **Phase 5** Anomaly detection (scikit-learn) + alerting (email/web) + WebSocket push
-- **Phase 6** Auth/RBAC/audit logs, reports & export, AI troubleshooting assistant
+  uptime/downtime/flap stats remain open for a later phase
+- **Phase 5** ✅ Advanced RCA + network health — device health scores (0–100,
+  healthy/degraded/critical bands from alerts/incidents/events/status),
+  `GET /network-health` + dashboard health panel, `GET /incidents/{id}/rca`
+  culprit-device ranking with upstream dependencies, RCA block in the incidents
+  panel, health badges on the topology map
+- **Phase 6** Anomaly detection (scikit-learn) + alerting (email/web) + WebSocket push
+- **Phase 7** Auth/RBAC/audit logs, reports & export, AI troubleshooting assistant
 - TLS syslog transport (6514) and Alembic migrations — slotted into the phase where first
   needed
 

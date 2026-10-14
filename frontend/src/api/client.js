@@ -151,3 +151,19 @@ export function updateLink(id, payload) {
 export function deleteLink(id) {
   return deviceMutation(`/v1/links/${id}`, 'DELETE', null);
 }
+
+// --- RCA & network health (Phase 5) ---------------------------------------
+
+export function fetchIncidentRca(id) {
+  return request(`/v1/incidents/${id}/rca`);
+}
+
+export function fetchNetworkHealth(params = {}) {
+  const query = new URLSearchParams({ limit: '100' });
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== '' && value !== null && value !== undefined) {
+      query.set(key, String(value));
+    }
+  });
+  return request(`/v1/network-health?${query.toString()}`);
+}

@@ -2,7 +2,8 @@
 
 The graph endpoint derives highlighting from existing data:
 open alerts (status != resolved) and active incidents mark nodes/links as
-``affected`` and carry the maximum severity for colouring.
+``affected`` and carry the maximum severity for colouring. The underlying
+aggregations are shared with Phase 5 health/RCA via ``app.health.queries``.
 """
 
 from __future__ import annotations
@@ -12,10 +13,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.correlation.engine import ACTIVE_STATUSES
 from app.db.session import get_db
 from app.detection.types import AlertSeverity
-from app.models.models import Alert, Device, Incident, TopologyLink
+from app.health.queries import active_incidents_by_device, open_alerts_by_device
+from app.models.models import Device, TopologyLink
 from app.schemas.topology import (
     LinkCreate,
     LinkUpdate,
@@ -36,45 +37,6 @@ def _max_severity(severities: list[str | None]) -> str | None:
     return max(ranked, key=lambda value: _SEVERITY_ORDER.index(value))
 
 
-def _open_alerts(db: Session) -> dict[int, dict]:
-    """Open (non-resolved) alerts grouped by device id."""
-    alerts = (
-        db.execute(select(Alert).where(Alert.status != "resolved")).scalars().all()
-    )
-    grouped: dict[int, dict] = {}
-    for alert in alerts:
-        if alert.device_id is None:
-            continue
-        entry = grouped.setdefault(
-            alert.device_id, {"count": 0, "severities": [], "interfaces": set()}
-        )
-        entry["count"] += 1
-        entry["severities"].append(alert.severity)
-        interface = (alert.context or {}).get("interface")
-        if interface:
-            entry["interfaces"].add(str(interface))
-    return grouped
-
-
-def _active_incidents(db: Session) -> dict[int, list[str]]:
-    """Active incident severities grouped by affected device id."""
-    incidents = (
-        db.execute(select(Incident).where(Incident.status.in_(ACTIVE_STATUSES)))
-        .scalars()
-        .all()
-    )
-    grouped: dict[int, list[str]] = {}
-    for incident in incidents:
-        device_ids = {incident.device_id}
-        for entry in incident.affected_devices or []:
-            if entry.get("device_id"):
-                device_ids.add(entry["device_id"])
-        for device_id in device_ids:
-            if device_id:
-                grouped.setdefault(device_id, []).append(incident.severity)
-    return grouped
-
-
 @router.get(
     "/topology",
     response_model=TopologyResponse,
@@ -83,8 +45,8 @@ def _active_incidents(db: Session) -> dict[int, list[str]]:
 def get_topology(db: Session = Depends(get_db)) -> TopologyResponse:
     devices = list(db.execute(select(Device)).scalars().all())
     links = list(db.execute(select(TopologyLink)).scalars().all())
-    alerts_by_device = _open_alerts(db)
-    incidents_by_device = _active_incidents(db)
+    alerts_by_device = open_alerts_by_device(db)
+    incidents_by_device = active_incidents_by_device(db)
 
     nodes: list[TopologyNodeOut] = []
     for device in devices:

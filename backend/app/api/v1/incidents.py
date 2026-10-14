@@ -15,6 +15,7 @@ from app.correlation.engine import (
 from app.correlation.engine import get_correlation_engine
 from app.correlation.types import IncidentSeverity, IncidentStatus
 from app.db.session import get_db
+from app.health.rca import build_rca_report
 from app.models.models import Alert, Incident
 from app.realtime.broadcaster import alert_broadcaster
 from app.schemas.alert import AlertOut
@@ -26,6 +27,7 @@ from app.schemas.incident import (
     IncidentTimelineResponse,
     TimelineEntry,
 )
+from app.schemas.network_health import RcaReportResponse
 
 router = APIRouter(tags=["incidents"])
 
@@ -197,3 +199,21 @@ def incident_timeline(
         incident_id=incident.id,
         entries=[TimelineEntry(**entry) for entry in entries],
     )
+
+
+@router.get(
+    "/incidents/{incident_id}/rca",
+    response_model=RcaReportResponse,
+    summary="Root-cause analysis report for an incident",
+)
+def incident_rca(
+    incident_id: int, db: Session = Depends(get_db)
+) -> RcaReportResponse:
+    """Phase 5 RCA: ranked culprit devices, upstream dependencies, explanation.
+
+    Reuses the Phase 3 failure-mode candidates plus member-alert evidence,
+    alert timestamps and topology links. Derived at query time — safe to call
+    repeatedly as the incident evolves.
+    """
+    incident = _load_incident(incident_id, db)
+    return RcaReportResponse(**build_rca_report(db, incident))

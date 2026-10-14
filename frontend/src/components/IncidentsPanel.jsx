@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import {
   acknowledgeIncident,
   closeIncident,
+  fetchIncidentRca,
   fetchIncidentTimeline,
   resolveIncident,
 } from '../api/client.js';
@@ -44,7 +45,7 @@ function TimelineEntryRow({ entry }) {
   );
 }
 
-function IncidentRow({ incident, busy, expanded, timeline, onAct, onToggle }) {
+function IncidentRow({ incident, busy, expanded, timeline, rca, onAct, onToggle }) {
   return (
     <>
       <tr className="hover:bg-slate-50">
@@ -123,6 +124,45 @@ function IncidentRow({ incident, busy, expanded, timeline, onAct, onToggle }) {
       {expanded && (
         <tr className="bg-slate-50">
           <td colSpan={7} className="px-6 py-3">
+            {rca && (
+              <div className="mb-3 rounded border border-indigo-200 bg-indigo-50/60 p-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                  Root-cause analysis
+                </p>
+                <p className="mb-2 text-sm text-slate-700">{rca.summary}</p>
+                {rca.device_ranking?.length > 0 && (
+                  <ul className="mb-2 space-y-1">
+                    {rca.device_ranking.map((device) => (
+                      <li key={device.device_id} className="text-xs text-slate-600">
+                        <span className="font-mono font-semibold text-slate-800">
+                          #{device.rank}
+                        </span>{' '}
+                        <span className="font-medium">
+                          {device.hostname || device.ip_address || `device ${device.device_id}`}
+                        </span>{' '}
+                        <span className="font-mono text-slate-500">
+                          ({device.score})
+                        </span>
+                        {device.reasons?.length > 0 && (
+                          <span className="text-slate-400"> — {device.reasons.join('; ')}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {rca.upstream_dependencies?.length > 0 && (
+                  <p className="text-xs text-slate-600">
+                    <span className="font-medium">Upstream dependencies:</span>{' '}
+                    {rca.upstream_dependencies
+                      .map(
+                        (dep) =>
+                          `${dep.hostname || dep.ip_address || `device ${dep.device_id}`} (${dep.hops} hop${dep.hops === 1 ? '' : 's'})`
+                      )
+                      .join(' · ')}
+                  </p>
+                )}
+              </div>
+            )}
             <ul className="space-y-1">
               {timeline.map((entry, index) => (
                 <TimelineEntryRow key={index} entry={entry} />
@@ -139,6 +179,7 @@ export default function IncidentsPanel({ incidents, live, onChanged, onError }) 
   const [busyId, setBusyId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [timeline, setTimeline] = useState([]);
+  const [rca, setRca] = useState(null);
 
   const act = async (id, action) => {
     setBusyId(id);
@@ -158,14 +199,19 @@ export default function IncidentsPanel({ incidents, live, onChanged, onError }) 
   const toggleTimeline = useCallback(async (id) => {
     if (expandedId === id) {
       setExpandedId(null);
+      setRca(null);
       return;
     }
     try {
-      const data = await fetchIncidentTimeline(id);
-      setTimeline(data.entries);
+      const [timelineData, rcaData] = await Promise.all([
+        fetchIncidentTimeline(id),
+        fetchIncidentRca(id),
+      ]);
+      setTimeline(timelineData.entries);
+      setRca(rcaData);
       setExpandedId(id);
     } catch (err) {
-      /* keep panel usable even if timeline fails */
+      /* keep panel usable even if timeline/RCA fails */
     }
   }, [expandedId]);
 
@@ -211,6 +257,7 @@ export default function IncidentsPanel({ incidents, live, onChanged, onError }) 
                   busy={busyId === incident.id}
                   expanded={expandedId === incident.id}
                   timeline={timeline}
+                  rca={expandedId === incident.id ? rca : null}
                   onAct={act}
                   onToggle={() => toggleTimeline(incident.id)}
                 />

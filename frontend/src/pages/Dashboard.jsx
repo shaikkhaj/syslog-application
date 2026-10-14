@@ -4,12 +4,14 @@ import {
   fetchEvents,
   fetchHealth,
   fetchIncidents,
+  fetchNetworkHealth,
 } from '../api/client.js';
 import AlertsPanel from '../components/AlertsPanel.jsx';
 import EventsTable from '../components/EventsTable.jsx';
 import FilterBar from '../components/FilterBar.jsx';
 import HealthCard from '../components/HealthCard.jsx';
 import IncidentsPanel from '../components/IncidentsPanel.jsx';
+import NetworkHealthPanel from '../components/NetworkHealthPanel.jsx';
 
 const REFRESH_INTERVAL_MS = 5000;
 
@@ -24,6 +26,7 @@ export default function Dashboard() {
   const [total, setTotal] = useState(0);
   const [alerts, setAlerts] = useState([]);
   const [incidents, setIncidents] = useState([]);
+  const [networkHealth, setNetworkHealth] = useState(null);
   const [wsLive, setWsLive] = useState(false);
   const [filters, setFilters] = useState({
     q: '',
@@ -55,13 +58,15 @@ export default function Dashboard() {
 
   const load = useCallback(async () => {
     try {
-      const [healthData, eventData] = await Promise.all([
+      const [healthData, eventData, networkHealthData] = await Promise.all([
         fetchHealth(),
         fetchEvents(filters),
+        fetchNetworkHealth({ limit: 50 }),
       ]);
       setHealth(healthData);
       setEvents(eventData.items);
       setTotal(eventData.total);
+      setNetworkHealth(networkHealthData);
       setLastUpdated(new Date());
       setError(null);
     } catch (err) {
@@ -132,7 +137,8 @@ export default function Dashboard() {
             Network Syslog Monitoring
           </h1>
           <p className="text-sm text-slate-500">
-            Phase 2 — ingestion, detection engine &amp; real-time alerts
+            Phases 1–5 — ingestion, detection, correlation, RCA &amp; network
+            health
           </p>
         </div>
         <div className="text-right text-xs text-slate-500">
@@ -152,6 +158,10 @@ export default function Dashboard() {
 
       <div className="mb-6">
         <HealthCard health={health} />
+      </div>
+
+      <div className="mb-4">
+        <NetworkHealthPanel health={networkHealth} />
       </div>
 
       <div className="mb-4">

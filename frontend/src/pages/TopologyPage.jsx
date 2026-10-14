@@ -4,6 +4,7 @@ import {
   createLink,
   deleteDevice,
   deleteLink,
+  fetchNetworkHealth,
   fetchTopology,
   updateDevice,
   updateLink,
@@ -25,6 +26,7 @@ function Field({ label, children }) {
 
 export default function TopologyPage() {
   const [graph, setGraph] = useState({ nodes: [], links: [] });
+  const [health, setHealth] = useState(null);
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState(null);
   const [mode, setMode] = useState(null); // 'device' | 'link'
@@ -46,7 +48,12 @@ export default function TopologyPage() {
 
   const reload = useCallback(async () => {
     try {
-      setGraph(await fetchTopology());
+      const [topology, healthData] = await Promise.all([
+        fetchTopology(),
+        fetchNetworkHealth({ limit: 500 }),
+      ]);
+      setGraph(topology);
+      setHealth(healthData);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -107,6 +114,9 @@ export default function TopologyPage() {
   };
 
   const affectedCount = graph.nodes.filter((node) => node.affected).length;
+  const healthById = Object.fromEntries(
+    (health?.items || []).map((item) => [item.device_id, item])
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
@@ -118,6 +128,37 @@ export default function TopologyPage() {
             <span className="font-medium text-red-600">{affectedCount} affected</span>
           </p>
         </div>
+        {health && (
+          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-500 shadow-sm">
+            <span className="font-semibold uppercase tracking-wide">
+              Network health
+            </span>
+              {health.overall_score !== undefined && (
+                <span
+                  className={`font-mono text-lg font-bold leading-none ${
+                    health.band === 'critical'
+                      ? 'text-red-600'
+                      : health.band === 'degraded'
+                        ? 'text-amber-600'
+                        : 'text-emerald-600'
+                  }`}
+                >
+                  {Math.round(health.overall_score)}
+                </span>
+              )}
+            <span
+              className={`rounded px-1.5 py-0.5 font-bold uppercase ${
+                health.band === 'critical'
+                  ? 'bg-red-100 text-red-700'
+                  : health.band === 'degraded'
+                    ? 'bg-amber-100 text-amber-700'
+                    : 'bg-emerald-100 text-emerald-700'
+              }`}
+            >
+              {health.band}
+            </span>
+          </div>
+        )}
         <div className="flex gap-2">
           <button
             onClick={() => setMode(mode === 'device' ? null : 'device')}
@@ -145,6 +186,7 @@ export default function TopologyPage() {
           <TopologyView
             nodes={graph.nodes}
             links={graph.links}
+            health={healthById}
             selected={selected}
             onSelect={setSelected}
           />
@@ -315,6 +357,23 @@ export default function TopologyPage() {
                   </span>
                 )}
               </h2>
+              {healthById[selected.id] && (
+                <p className="text-xs text-slate-600">
+                  <span className="font-medium">Health:</span>{' '}
+                  <span
+                    className={`font-mono font-bold ${
+                      healthById[selected.id].band === 'critical'
+                        ? 'text-red-600'
+                        : healthById[selected.id].band === 'degraded'
+                          ? 'text-amber-600'
+                          : 'text-emerald-600'
+                    }`}
+                  >
+                    {Math.round(healthById[selected.id].score)}/100
+                  </span>{' '}
+                  <span className="uppercase">{healthById[selected.id].band}</span>
+                </p>
+              )}
               <Field label="Hostname">
                 <input
                   className={INPUT}

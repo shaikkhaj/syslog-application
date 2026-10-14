@@ -15,6 +15,12 @@ const SEVERITY_RING = {
   INFO: '#38bdf8',
 };
 
+const BAND_COLORS = {
+  critical: '#dc2626',
+  degraded: '#d97706',
+  healthy: '#059669',
+};
+
 function severityRing(node) {
   return node.affected ? SEVERITY_RING[node.max_severity] || '#f97316' : '#cbd5e1';
 }
@@ -23,8 +29,9 @@ function severityRing(node) {
  * Dependency-free interactive SVG topology:
  *  - deterministic circle layout, nodes stay where users drag them
  *  - click a node / link to select it (parent renders the editor panel)
+ *  - optional `health` map (device_id → health item) draws score badges
  */
-export default function TopologyView({ nodes, links, selected, onSelect }) {
+export default function TopologyView({ nodes, links, health = {}, selected, onSelect }) {
   const positionsRef = useRef({});
   const dragRef = useRef(null);
   const [, forceRender] = useState(0);
@@ -112,6 +119,8 @@ export default function TopologyView({ nodes, links, selected, onSelect }) {
       {nodes.map((node) => {
         const { x, y } = positionOf(node.id);
         const isSelected = selected?.kind === 'node' && selected.id === node.id;
+        const nodeHealth = health[node.id];
+        const bandColor = nodeHealth ? BAND_COLORS[nodeHealth.band] : null;
         return (
           <g
             key={node.id}
@@ -135,6 +144,20 @@ export default function TopologyView({ nodes, links, selected, onSelect }) {
             <text y={4} textAnchor="middle" fontSize="12" fill="#fff">
               {node.device_type === 'firewall' ? '🛡' : node.device_type[0].toUpperCase()}
             </text>
+            {nodeHealth && (
+              <g transform="translate(17, -17)">
+                <circle r={10} fill="#fff" stroke={bandColor} strokeWidth={1.5} />
+                <text
+                  y={3}
+                  textAnchor="middle"
+                  fontSize="8"
+                  fontWeight="bold"
+                  fill={bandColor}
+                >
+                  {Math.round(nodeHealth.score)}
+                </text>
+              </g>
+            )}
             <text y={38} textAnchor="middle" fontSize="11" fill="#0f172a">
               {node.hostname || node.ip_address}
             </text>
