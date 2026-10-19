@@ -24,7 +24,7 @@ function Field({ label, children }) {
   );
 }
 
-export default function TopologyPage() {
+export default function TopologyPage({ initialDeviceId = null }) {
   const [graph, setGraph] = useState({ nodes: [], links: [] });
   const [health, setHealth] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -63,6 +63,13 @@ export default function TopologyPage() {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // Preselect a device when deep-linked from the dashboard (#/topology?device=N).
+  useEffect(() => {
+    if (!initialDeviceId) return;
+    const node = graph.nodes.find((n) => n.id === initialDeviceId);
+    if (node) setSelected({ kind: 'node', id: node.id, data: node });
+  }, [initialDeviceId, graph.nodes]);
 
   // Keep editor form state in sync with the current graph/selection.
   useEffect(() => {
