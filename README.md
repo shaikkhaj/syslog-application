@@ -5,12 +5,12 @@ Juniper, Linux), normalizes events into a common format, stores them in PostgreS
 in later phases — correlates them into incidents with root-cause analysis, topology-aware
 recommendations, health scoring, anomaly detection and an AI troubleshooting assistant.
 
-> **Status: Phase 5 complete** — ingestion + detection + incident correlation + network topology + **advanced RCA & network health**.
+> **Status: Phase 6 complete** — ingestion + detection + incident correlation + network topology + advanced RCA & network health + **interactive dashboard analytics**.
 > ML/AI anomaly detection and auth/RBAC arrive in later phases (see [Roadmap](#roadmap)).
 
 ---
 
-## Phase 5 architecture
+## Phase 6 architecture
 
 ```
  Devices (Cisco / FortiGate / Juniper / Linux)
@@ -41,11 +41,15 @@ recommendations, health scoring, anomaly detection and an AI troubleshooting ass
  └─────────────────────────────────────────────────────────────────────────────┘
         │                                        │
         ▼                                        ▼
- PostgreSQL 16 (events, devices,            React dashboard: incidents panel
- interfaces, event_types, alerts,           (score, root cause + confidence,
- incidents, incident_alerts,                ack/resolve/close, timeline),
- incident_events, incident_state_history,   alerts panel, live events,
- topology_links)                            interactive topology map, RCA/health panels
+ PostgreSQL 16 (events, devices,            React dashboard: incident/analytics
+ interfaces, event_types, alerts,           charts (event trend, alert severity,
+ incidents, incident_alerts,                incident status, device health),
+ incident_events, incident_state_history,   incident panel (score, root cause +
+ topology_links)                            confidence, ack/resolve/close,
+                                            timeline), alerts panel, live events,
+                                            interactive topology map, RCA/health
+                                            panels, time/device/severity filters,
+                                            auto-refresh
 ```
 
 Design notes:
@@ -67,6 +71,12 @@ Design notes:
   chronologically.
 - **Topology highlighting** is derived, not stored: `GET /api/v1/topology` marks
   nodes with open alerts or active incidents as `affected` and computes the
+- **Interactive dashboard analytics** — SVG event-trend chart (12 time buckets with hover
+  tooltips), alert-severity / incident-status / device-health bar lists with
+  click-to-filter and topology deep-links, time-range (15m/1h/6h/24h/7d/all), device and
+  severity filters, incident-status clear, auto-refresh toggle + refresh-now with
+  last-updated stamp, accessible section navigation, and loading/error/empty states on
+  every section; charts are computed client-side from the existing REST endpoints.
   maximum severity for colouring; links inherit severity from an endpoint in an
   active incident, an endpoint with open alerts, or an alert whose
   `context.interface` matches one of the link's interface names. Devices carry a
@@ -419,8 +429,16 @@ Inside Docker: `docker compose exec backend pytest`.
   `GET /network-health` + dashboard health panel, `GET /incidents/{id}/rca`
   culprit-device ranking with upstream dependencies, RCA block in the incidents
   panel, health badges on the topology map
-- **Phase 6** Anomaly detection (scikit-learn) + alerting (email/web) + WebSocket push
-- **Phase 7** Auth/RBAC/audit logs, reports & export, AI troubleshooting assistant
+- **Phase 6** ✅ Interactive dashboard analytics — dependency-free SVG charts (event trend
+  buckets with hover tooltips, alert severity / incident status / device-health bar lists
+  with click-to-filter), time-range (15m/1h/6h/24h/7d/all), device and severity filters,
+  incident-status clear, auto-refresh toggle + refresh-now with last-updated stamp,
+  accessible section navigation, deep-link from charts to `#/topology?device=N`, and
+  loading/error/empty states on every section; all data derived from the existing
+  `/events`, `/alerts`, `/incidents`, `/network-health`, `/devices` endpoints (no new
+  backend APIs)
+- **Phase 7** Anomaly detection (scikit-learn) + alerting (email/web)
+- **Phase 8** Auth/RBAC/audit logs, reports & export, AI troubleshooting assistant
 - TLS syslog transport (6514) and Alembic migrations — slotted into the phase where first
   needed
 
