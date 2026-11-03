@@ -1,0 +1,8 @@
+﻿docker : ERROR: use `docker --context=default buildx` to switch to context "default"
+At line:1 char:40
++ ... og-applica; docker buildx build --builder default --no-cache --load - ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ERROR: use `doc...ntext "default":String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+DONE

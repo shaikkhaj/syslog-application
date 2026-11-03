@@ -1,0 +1,14 @@
+﻿docker : Error response from daemon: No such image: syslog-platform-frontend:latest
+At line:1 char:40
++ ... og-applica; docker history syslog-platform-frontend --format '{{.Crea ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Error response ...frontend:latest:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ID                           RECLAIMABLE   SIZE       LAST ACCESSED
+yha2plc7ac9lltwtdotk6s56p*   true          4.096kB    10 minutes ago
+
+  docker build, docker builder build, docker image build, docker buildx b
+      --builder string                Override the configured builder instance
+
+

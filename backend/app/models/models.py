@@ -27,7 +27,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 
@@ -349,7 +349,102 @@ class Alert(Base):
     )
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(PK, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    email: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
+    hashed_password: Mapped[str] = mapped_column(String(256), nullable=False)
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
+    is_superuser: Mapped[bool] = mapped_column(default=False, nullable=False)
+    is_staff: Mapped[bool] = mapped_column(default=False, nullable=False)
+    role_id: Mapped[int | None] = mapped_column(
+        ForeignKey("roles.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    failed_login_attempts: Mapped[int] = mapped_column(default=0, nullable=False)
+    locked_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_failed_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    source_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+
+    # Relationships
+    role: Mapped["Role"] = relationship(back_populates="users")
+    audit_logs: Mapped[list["AuditLog"]] = relationship(
+        back_populates="actor", foreign_keys="AuditLog.actor_id"
+    )
+
+
+class Role(Base):
+    __tablename__ = "roles"
+
+    id: Mapped[int] = mapped_column(PK, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_system: Mapped[bool] = mapped_column(default=False, nullable=False)
+
+    # Relationships
+    users: Mapped[list["User"]] = relationship(back_populates="role")
+    permissions: Mapped[list["Permission"]] = relationship(
+        back_populates="role", cascade="all, delete-orphan"
+    )
+
+
+class Permission(Base):
+    __tablename__ = "permissions"
+
+    id: Mapped[int] = mapped_column(PK, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resource: Mapped[str] = mapped_column(String(64), nullable=False)
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"), nullable=False)
+
+    # Relationships
+    role: Mapped["Role"] = relationship(back_populates="permissions")
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+    __table_args__ = (
+        Index("ix_audit_log_actor_timestamp", "actor_id", "created_at"),
+        Index("ix_audit_log_action_timestamp", "action", "created_at"),
+        Index("ix_audit_log_target_timestamp", "target_resource", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(PK, primary_key=True, autoincrement=True)
+    actor_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    actor_username: Mapped[str] = mapped_column(String(64), nullable=True)
+    action: Mapped[str] = mapped_column(String(128), nullable=False)
+    target_resource: Mapped[str] = mapped_column(String(128), nullable=True)
+    target_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    outcome: Mapped[str] = mapped_column(String(16), nullable=False)  # "success" or "failure"
+    source_ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
+    log_metadata: Mapped[dict | None] = mapped_column(JSONField, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+    # Relationships
+    actor: Mapped["User"] = relationship(back_populates="audit_logs", foreign_keys="AuditLog.actor_id")
+
+
 class SyslogEvent(Base):
+    """Normalized syslog event record."""
+
     __tablename__ = "syslog_events"
     __table_args__ = (
         Index("ix_syslog_events_received_at", "received_at"),

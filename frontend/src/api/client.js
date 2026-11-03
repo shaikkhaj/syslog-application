@@ -157,6 +157,73 @@ export function deleteLink(id) {
 export function fetchIncidentRca(id) {
   return request(`/v1/incidents/${id}/rca`);
 }
+// --- Notifications (Phase 7) -----------------------------------------------
+
+export function fetchNotifications(params = {}) {
+  const query = new URLSearchParams({ limit: '50' });
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== '' && value !== null && value !== undefined) {
+      query.set(key, String(value));
+    }
+  });
+  return request(`/v1/notifications?${query.toString()}`);
+}
+
+export function fetchUnreadCount() {
+  return request('/v1/notifications/unread-count');
+}
+
+export async function markNotificationRead(id, actor = 'dashboard-user') {
+  const response = await fetch(`${API_BASE}/v1/notifications/${id}/read`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actor }),
+  });
+  if (!response.ok) {
+    throw new Error(`Mark read failed with status ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function markAllNotificationsRead(actor = 'dashboard-user') {
+  const response = await fetch(`${API_BASE}/v1/notifications/read-all`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actor }),
+  });
+  if (!response.ok) {
+    throw new Error(`Mark all read failed with status ${response.status}`);
+  }
+  return response.json();
+}
+
+export function fetchNotificationSettings() {
+  return request('/v1/notifications/settings');
+}
+
+export async function updateNotificationSettings(payload) {
+  const response = await fetch(`${API_BASE}/v1/notifications/settings`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(`Update settings failed with status ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function triggerEscalation() {
+  const response = await fetch(`${API_BASE}/v1/notifications/escalate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) {
+    throw new Error(`Escalation failed with status ${response.status}`);
+  }
+  return response.json();
+}
+
 
 export function fetchNetworkHealth(params = {}) {
   const query = new URLSearchParams({ limit: '100' });

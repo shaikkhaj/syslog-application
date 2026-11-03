@@ -11,7 +11,7 @@
 
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16.10-alpine
     container_name: syslog-platform-db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-syslog_user}

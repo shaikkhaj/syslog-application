@@ -1,0 +1,8 @@
+﻿20-alpine: Pulling from library/node
+fff4e2c1b189: Pulling fs layer
+b2cbbfe903b0: Pulling fs layer
+4feea04c1543: Pulling fs layer
+6a0ac1617861: Pulling fs layer
+Digest: sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+Status: Downloaded newer image for node:20-alpine
+docker.io/library/node:20-alpine

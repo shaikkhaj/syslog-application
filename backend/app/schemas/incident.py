@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from app.schemas.alert import AlertOut
 
@@ -34,6 +34,13 @@ class IncidentOut(BaseModel):
     closed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
+    @field_validator("root_cause_candidates", mode="before")
+    @classmethod
+    def normalize_root_cause_candidates(cls, value):
+        if value is None:
+            return []
+        return value
+       
 
 
 class IncidentListResponse(BaseModel):

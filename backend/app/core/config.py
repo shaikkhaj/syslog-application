@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +25,20 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
 
+    # Authentication / JWT ---------------------------------------------
+    secret_key: str = Field(
+        default="change-me-to-a-strong-random-value",
+        description="JWT signing key — MUST be changed in production",
+    )
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 7
+
+    # CORS -------------------------------------------------------------
+    cors_allow_credentials: bool = True
+    cors_allow_methods: str = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+    cors_allow_headers: str = "Authorization,Content-Type,Accept,Origin,X-Requested-With"
+
     # PostgreSQL ------------------------------------------------------
     postgres_host: str = "localhost"
     postgres_port: int = 5432
@@ -35,6 +50,31 @@ class Settings(BaseSettings):
 
     # Redis -----------------------------------------------------------
     redis_url: str = "redis://localhost:6379/0"
+
+    @model_validator(mode="after")
+    def _validate_production_settings(self) -> "Settings":
+        """Warn when running in production with insecure defaults.
+
+        Does not raise in development so local dev keeps working. In
+        production (ENVIRONMENT=production) an insecure SECRET_KEY is a
+        hard failure.
+        """
+        if self.environment == "production":
+            insecure = (
+                self.secret_key == "change-me-to-a-strong-random-value"
+                or len(self.secret_key) < 32
+            )
+            if insecure:
+                raise ValueError(
+                    "PRODUCTION: SECRET_KEY must be set to a strong random value "
+                    "(at least 32 characters) via the SECRET_KEY environment variable"
+                )
+            if "http://localhost" in self.cors_origins or "*" in self.cors_origins:
+                raise ValueError(
+                    "PRODUCTION: CORS_ORIGINS must not contain localhost or wildcard "
+                    "when ENVIRONMENT=production"
+                )
+        return self
 
     # Syslog listeners -------------------------------------------------
     syslog_listeners_enabled: bool = True
@@ -79,6 +119,10 @@ class Settings(BaseSettings):
     correlation_score_event_type_weight: float = 8.0
     correlation_score_duration_weight: float = 0.2
 
+    # Notifications (Phase 7) ----------------------------------------------
+    notification_min_severity: str = "HIGH"
+    escalation_delay_minutes: int = 15
+
     def build_database_url(self) -> str:
         """Return the SQLAlchemy connection URL for PostgreSQL/SQLite."""
         if self.database_url:
@@ -92,8 +136,20 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
+    @property
+    def cors_allow_methods_list(self) -> list[str]:
+        return [m.strip() for m in self.cors_allow_methods.split(",") if m.strip()]
+
+    @property
+    def cors_allow_headers_list(self) -> list[str]:
+        return [h.strip() for h in self.cors_allow_headers.split(",") if h.strip()]
+
 
 @lru_cache
 def get_settings() -> Settings:
     """Return a process-wide cached settings instance."""
     return Settings()
+
+
+# Module-level settings instance for convenient importing.
+settings = get_settings()

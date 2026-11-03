@@ -1,0 +1,8 @@
+﻿
+docker : Error response from daemon: No such image: node:20-alpine
+At line:1 char:1
++ docker image inspect node:20-alpine --format '{{.Os}}/{{.Architecture ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Error response ... node:20-alpine:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

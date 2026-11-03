@@ -276,6 +276,10 @@ export default function Dashboard() {
             loadAlerts();
           } else if (payload.type === 'incident') {
             loadIncidents();
+          } else if (payload.type === 'notification') {
+            // Notification created/read — refresh the bell's unread badge
+            // by dispatching a custom event that NotificationBell listens for.
+            window.dispatchEvent(new CustomEvent('notification-update'));
           }
         } catch (err) {
           /* ignore malformed frames */
@@ -314,17 +318,14 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="dashboard-page mx-auto max-w-7xl px-4 py-6">
       <header className="mb-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-slate-800">
               Network Syslog Monitoring
             </h1>
-            <p className="text-sm text-slate-500">
-              Phases 1–6 — ingestion, detection, correlation, RCA, network
-              health &amp; live analytics
-            </p>
+           
           </div>
         </div>
         <nav className="mt-3 flex flex-wrap gap-2" aria-label="Dashboard sections">
@@ -372,7 +373,11 @@ export default function Dashboard() {
       </div>
 
       <div className="mb-4">
-        <HealthCard health={health} error={sectionErrors.health} />
+        <HealthCard
+          health={health}
+          error={sectionErrors.health}
+          onRetry={refreshAll}
+        />
       </div>
 
       <ChartsPanel

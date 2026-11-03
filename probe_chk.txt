@@ -1,0 +1,7 @@
+﻿
+docker : ERROR: use `docker --context=default buildx` to switch to context "default"
+    + CategoryInfo          : NotSpecified: (ERROR: use `doc...ntext "default":String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+DONE
+
+

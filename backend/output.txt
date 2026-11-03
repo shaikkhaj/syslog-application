@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "c:\Users\91991\Desktop\log-applica\backend\test_simple.py", line 13, in <module>
+    from app.main import app
+  File "c:\Users\91991\Desktop\log-applica\backend\app\main.py", line 15, in <module>
+    from app.api.v1 import api_router
+  File "c:\Users\91991\Desktop\log-applica\backend\app\api\v1\__init__.py", line 3, in <module>
+    from app.api.v1 import (
+  File "c:\Users\91991\Desktop\log-applica\backend\app\api\v1\alerts.py", line 14, in <module>
+    from app.models.models import Alert, Device, SyslogEvent
+  File "c:\Users\91991\Desktop\log-applica\backend\app\models\models.py", line 352, in <module>
+    class User(Base):
+  File "c:\Users\91991\Desktop\log-applica\backend\app\models\models.py", line 381, in User
+    role: Mapped["Role"] = relationship(back_populates="users")
+                           ^^^^^^^^^^^^
+NameError: name 'relationship' is not defined

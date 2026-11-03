@@ -1,0 +1,11 @@
+﻿
+#7 transferring context: 273.11kB 0.6s done
+#7 DONE 0.7s
+#11 DONE 0.1s
+#12 DONE 0.1s
+#13 0.684 exec /bin/sh: exec format error
+#13 ERROR: process "/bin/sh -c npm ci" did not complete successfully: exit code: 255
+0.684 exec /bin/sh: exec format error
+DONE
+
+

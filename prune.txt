@@ -1,0 +1,39 @@
+﻿ID						RECLAIMABLE	SIZE		LAST ACCESSED
+6ejelpzbwnaz6fku1538wl1x8*              	true 		13MB      	2 hours ago
+awc0r328argto3749gd6tfpyt*              	true 	28.67kB   	2 hours ago
+vrxpsklx9w4v3lhr0zlw2p08c*              	true 	8.192kB   	39 minutes ago
+b3o1i75xcef0qo1v02zqjlr43*              	true 	8.192kB   	21 minutes ago
+yha2plc7ac9lltwtdotk6s56p*              	true 	4.096kB   	21 minutes ago
+qvear4howf1shfbs0kntsqie9*              	true 	917.5kB   	39 minutes ago
+rtw723yz546w5ruuwzhv3aoti               	true 	102.4kB   	32 minutes ago
+ri0n6h3q9q1x0nb3lyms2r1vd               	true 	1.103MB   	39 minutes ago
+zinzafso7x4817u3sj7fpogfz               	true 	102.4kB   	21 minutes ago
+zknq076gmgrlpvhocp4xi1qvi*              	true 	4.096kB   	39 minutes ago
+qkrsyw167euq0f549g1notv8t*              	true 	28.67kB   	32 minutes ago
+xhbcvfxjw4pog1tivs5v0e07k*              	true 	64.52MB   	21 minutes ago
+rjl5wey1tak9a5qknqpq5w06g*              	true 	8.192kB   	6 minutes ago
+ye2cu31jdgv9dhzl55gho04o9               	true 	8.192kB   	Less than a second ago
+5gh5j1or9eggk4f8dt1t9bqy5               	true 	117.3MB   	2 hours ago
+pltmrdqmt307vrlaym56w6mm8*              	true 	28.67kB   	43 minutes ago
+7zjnswmtc5d96im0gplaneh11*              	true 	28.67kB   	21 minutes ago
+lm3oq4ltc7eg25wl1jiliu1j2*              	true 	4.096kB   	6 minutes ago
+5t0en96rnwbspajpl5qu47tpu               	true 	12.59kB   	2 hours ago
+nu43w3jxbc40l8lhhqi5h4rbc               	true 	20.93kB   	Less than a second ago
+oopdtm23wygj3lafrpf9x6dz0               	true 	54.2MB    	Less than a second ago
+u2ywbpexuj5ywrvoue1z1fb91               	true 	6.743MB   	Less than a second ago
+r0pq2qba804fagaj5v6jbijim               	true 	8.285kB   	Less than a second ago
+sfw68v4f7gl48598ewlxxuhr8               	true 	17.78kB   	Less than a second ago
+elih088tz9hld3kfqaykkhwb8               	true 	173.5MB   	Less than a second ago
+ou51mzjsveryqmezzr8mjdght               	true 	16.63kB   	Less than a second ago
+5jpngkqj8an4zc9t73n618g6q               	true 	13.5kB    	Less than a second ago
+aqcvdgmzkxo28cq2zqobibxkt               	true 	12.97MB   	Less than a second ago
+vnl68vso8wvh0o997yk42mz0f               	true 	53.51MB   	Less than a second ago
+jtdzzt3v3sbphcti294erwx0y               	true 	12.69kB   	Less than a second ago
+21afml92p0ulr58vjch54wi34               	true 	13.24kB   	Less than a second ago
+n2dw7gcfounbdoziou3gvio7x               	true 	6.238MB   	Less than a second ago
+b7srh42re3khoriho8chij45l               	true 	8.821kB   	Less than a second ago
+su48uavlj3dra2lmjsv5jcl1j               	true 	117.5MB   	Less than a second ago
+6qow9qkx5pmjzg6csgixc03nf               	true 	7.153MB   	Less than a second ago
+i8qo05i8dyq217iv2mwwkvpal               	true 	12.15MB   	Less than a second ago
+Total:	641.2MB
+DONE

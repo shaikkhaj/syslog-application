@@ -1,0 +1,61 @@
+﻿docker : #0 building with "desktop-linux" instance using docker driver
+At line:1 char:175
++ ... ne_chk.txt; docker buildx build --no-cache --load -t fe-probe -f Dock ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (#0 building wit...g docker driver:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+#1 [internal] load build definition from Dockerfile.probe
+#1 transferring dockerfile:
+#1 transferring dockerfile: 98B 0.1s done
+#1 DONE 0.4s
+
+#2 [internal] load metadata for docker.io/library/node:20-alpine
+#2 DONE 0.1s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B 0.0s done
+#3 DONE 0.1s
+
+#4 [1/2] FROM docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+#4 resolve docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 0.1s done
+#4 DONE 0.5s
+
+#4 [1/2] FROM docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+#4 extracting sha256:6a0ac1617861a677b045b7ff88545213ec31c0ff08763195a70a4a5adda577bb
+#4 extracting sha256:6a0ac1617861a677b045b7ff88545213ec31c0ff08763195a70a4a5adda577bb 0.3s done
+#4 DONE 0.8s
+
+#4 [1/2] FROM docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+#4 extracting sha256:4feea04c154301db6f4a496efa397b3db96603b1c009c797cfdde77bea8b3287
+#4 extracting sha256:4feea04c154301db6f4a496efa397b3db96603b1c009c797cfdde77bea8b3287 4.6s done
+#4 DONE 5.4s
+
+#4 [1/2] FROM docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+#4 extracting sha256:b2cbbfe903b0821005780971ddc5892edcc4ce74c5a48d82e1d2b382edac3122 0.1s done
+#4 DONE 5.6s
+
+#4 [1/2] FROM docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+#4 extracting sha256:fff4e2c1b189bf87d63ad8bd07f7f4eb288d6f2b6a07a8bb44c60e8c075d2096 0.0s done
+#4 DONE 5.6s
+
+#5 [2/2] RUN uname -m && echo BUILDKIT_OK
+#5 0.713 x86_64
+#5 0.714 BUILDKIT_OK
+#5 ERROR: error committing riqml8v38czlvx5r2hy864udc: write /var/lib/docker/buildkit/containerd-overlayfs/metadata_v2.db: 
+input/output error
+------
+ > [2/2] RUN uname -m && echo BUILDKIT_OK:
+0.713 x86_64
+0.714 BUILDKIT_OK
+------
+Dockerfile.probe:2
+--------------------
+   1 |     FROM node:20-alpine
+   2 | >>> RUN uname -m && echo BUILDKIT_OK
+   3 |     
+--------------------
+ERROR: failed to build: failed to solve: Internal: error committing riqml8v38czlvx5r2hy864udc: write 
+/var/lib/docker/buildkit/containerd-overlayfs/metadata_v2.db: input/output error
+DONE

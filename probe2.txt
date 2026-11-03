@@ -1,0 +1,40 @@
+﻿docker : #0 building with "desktop-linux" instance using docker driver
+At line:1 char:40
++ ... og-applica; docker buildx build --no-cache --load -t fe-probe -f Dock ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (#0 building wit...g docker driver:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+#1 [internal] load build definition from Dockerfile.probe
+#1 transferring dockerfile:
+#1 transferring dockerfile: 98B 0.1s done
+#1 DONE 0.4s
+
+#2 [internal] load metadata for docker.io/library/node:20-alpine
+#2 DONE 0.1s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.1s
+
+#4 [1/2] FROM docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+#4 resolve docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 0.1s done
+#4 CACHED
+
+#5 [2/2] RUN uname -m && echo BUILDKIT_OK
+#5 0.377 exec /bin/sh: exec format error
+#5 ERROR: process "/bin/sh -c uname -m && echo BUILDKIT_OK" did not complete successfully: exit code: 255
+------
+ > [2/2] RUN uname -m && echo BUILDKIT_OK:
+0.377 exec /bin/sh: exec format error
+------
+Dockerfile.probe:2
+--------------------
+   1 |     FROM node:20-alpine
+   2 | >>> RUN uname -m && echo BUILDKIT_OK
+   3 |     
+--------------------
+ERROR: failed to build: failed to solve: process "/bin/sh -c uname -m && echo BUILDKIT_OK" did not complete successfully: 
+exit code: 255
+DONE

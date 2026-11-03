@@ -1,0 +1,5 @@
+﻿FREE_GB=0
+C:\Users\91991\AppData\Local\Docker\wsl\disk\docker_data.vhdx = 4.2 GB
+C:\Users\91991\AppData\Local\Docker\wsl\main\ext4.vhdx = 0.1 GB
+C:\Users\91991\AppData\Local\Programs\DockerDesktop\resources\wsl\ext4.vhdx = 0.1 GB
+C:\Users\91991\AppData\Local\Temp\38815392-F514-408F-AD6F-436B73F359B9\swap.vhdx = 0.0 GB

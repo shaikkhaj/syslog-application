@@ -1,0 +1,1 @@
+﻿{"items":[{"id":3,"hostname":"rtr-core-01","ip_address":"172.18.0.1","vendor":"cisco","device_type":"router","status":"active","first_seen_at":"2026-10-19T07:11:46.976445Z","last_seen_at":"2026-10-19T07:11:50.046569Z","event_count":50}],"total":1}

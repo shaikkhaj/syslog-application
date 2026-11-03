@@ -1,0 +1,11 @@
+﻿
+#5 [2/2] RUN uname -m && echo BUILDKIT_OK
+#5 0.377 exec /bin/sh: exec format error
+#5 ERROR: process "/bin/sh -c uname -m && echo BUILDKIT_OK" did not complete successfully: exit code: 255
+ > [2/2] RUN uname -m && echo BUILDKIT_OK:
+0.377 exec /bin/sh: exec format error
+   2 | >>> RUN uname -m && echo BUILDKIT_OK
+ERROR: failed to build: failed to solve: process "/bin/sh -c uname -m && echo BUILDKIT_OK" did not complete successfully: 
+DONE
+
+

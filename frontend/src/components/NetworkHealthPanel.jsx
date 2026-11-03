@@ -1,3 +1,5 @@
+import { ErrorBlock } from './States.jsx';
+
 const BAND_STYLES = {
   healthy: 'bg-emerald-100 text-emerald-700',
   degraded: 'bg-amber-100 text-amber-700',
@@ -21,7 +23,15 @@ function scoreColor(band) {
  * Data comes from GET /api/v1/network-health (alerts, incidents, event
  * frequency and device status — nothing stored).
  */
-export default function NetworkHealthPanel({ health }) {
+export default function NetworkHealthPanel({ health, error, onRetry }) {
+  if (error) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <ErrorBlock message={error} onRetry={onRetry} />
+      </div>
+    );
+  }
+
   if (!health) {
     return (
       <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-400 shadow-sm">

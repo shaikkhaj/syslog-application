@@ -1,0 +1,1 @@
+﻿{"nodes":[{"id":3,"hostname":"rtr-core-01","ip_address":"172.18.0.1","vendor":"cisco","device_type":"router","status":"active","last_seen_at":"2026-10-19T07:11:50.046569Z","affected":true,"open_alert_count":19,"open_incident_count":4,"max_severity":"CRITICAL"}],"links":[]}

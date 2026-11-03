@@ -236,6 +236,21 @@ class CorrelationEngine:
         )
         self._link_alert(db, incident, alert)
         self._finalize(db, incident)
+        # Fire an in-app notification for the new incident (Phase 7).
+        from app.services.notification_service import create_notification
+
+        create_notification(
+            db,
+            type="incident",
+            severity=incident.severity,
+            title=incident.title,
+            message=f"Incident #{incident.id} created from alert #{alert.id}",
+            related_incident_id=incident.id,
+            context={
+                "correlation_key": incident.correlation_key,
+                "alert_id": alert.id,
+            },
+        )
         db.commit()
 
         self._bump("incidents_created")

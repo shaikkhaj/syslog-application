@@ -1,0 +1,8 @@
+﻿  TCP    0.0.0.0:514            0.0.0.0:0              LISTENING
+  TCP    0.0.0.0:8000           0.0.0.0:0              LISTENING
+  TCP    [::]:514               [::]:0                 LISTENING
+  TCP    [::]:8000              [::]:0                 LISTENING
+  TCP    [::1]:514              [::]:0                 LISTENING
+  TCP    [::1]:8000             [::]:0                 LISTENING
+  UDP    0.0.0.0:514            *:*                    
+  UDP    [::]:514               *:*                    

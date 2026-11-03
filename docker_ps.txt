@@ -1,0 +1,6 @@
+﻿NAMES                      STATUS                          PORTS
+syslog-platform-db         Up 17 minutes (healthy)         5432/tcp
+syslog-platform-redis      Up About an hour (healthy)      6379/tcp
+syslog-platform-frontend   Restarting (1) 39 seconds ago   
+syslog-platform-backend    Up 15 minutes (healthy)         0.0.0.0:514->514/tcp, [::]:514->514/tcp, 0.0.0.0:8000->8000/tcp, 0.0.0.0:514->514/udp, [::]:8000->8000/tcp, [::]:514->514/udp
+buildx_buildkit_default    Up About an hour                

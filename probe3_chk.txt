@@ -1,0 +1,11 @@
+﻿
+input/output error
+ > [2/2] RUN uname -m && echo BUILDKIT_OK:
+0.713 x86_64
+0.714 BUILDKIT_OK
+   2 | >>> RUN uname -m && echo BUILDKIT_OK
+ERROR: failed to build: failed to solve: Internal: error committing riqml8v38czlvx5r2hy864udc: write 
+/var/lib/docker/buildkit/containerd-overlayfs/metadata_v2.db: input/output error
+DONE
+
+

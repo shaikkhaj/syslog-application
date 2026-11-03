@@ -12,7 +12,7 @@ import {
 import TopologyView from '../components/TopologyView.jsx';
 
 const INPUT =
-  'rounded border border-slate-300 px-2 py-1 text-sm w-full disabled:bg-slate-100';
+  'w-full rounded-lg border border-slate-700 bg-[#0b1628] px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-blue-500 focus:outline-none disabled:bg-slate-800';
 const DEVICE_TYPES = ['router', 'switch', 'firewall', 'server'];
 
 function Field({ label, children }) {
@@ -126,7 +126,7 @@ export default function TopologyPage({ initialDeviceId = null }) {
   );
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div className="topology-page mx-auto max-w-7xl px-4 py-6">
       <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Network Topology</h1>

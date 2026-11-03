@@ -1,0 +1,42 @@
+﻿Sending 40 syslog messages (all) to 127.0.0.1:514/UDP ...
+[  1/40] <186>date=2026-10-19 time=07:11:46 devname="FGT60F-001" devid="FG60F000000001" logid="0100020004" type="event"
+[  2/40] <186>date=2026-10-19 time=07:11:46 devname="FGT60F-001" devid="FG60F000000001" logid="0100030001" type="event"
+[  3/40] <130>Oct 19 07:11:46 rtr-core-01: %SYS-5-CONFIG_I: Configured from console by admin on vty0 (10.0.0.5)
+[  4/40] <133>Oct 19 07:11:47 sw-access-01: %CPU_FALLBACK-3-HIGH_CPU: cpu_utilization=95% threshold=80% interval=60s
+[  5/40] <14>Oct 19 07:11:47 mx-edge-01 rpd[1234]: BGP - 10.10.20.1 External AS 65002 state moved from OpenConfirm to E
+[  6/40] <30>1 2026-10-19T07:11:47.126Z db01 kernel - - - eth1: NIC Link is Down
+[  7/40] <11>Oct 19 07:11:47 web01 probe[888]: probe failed: connect to 10.9.9.9:443 - No route to host
+[  8/40] <133>Oct 19 07:11:47 sw-access-01: %CPU_FALLBACK-3-HIGH_CPU: cpu_utilization=95% threshold=80% interval=60s
+[  9/40] <130>Oct 19 07:11:47 rtr-core-01: %IPRT-4-UNREACHABLE: No route to host 10.5.5.5
+[ 10/40] <131>Oct 19 07:11:47 sw-access-01: %SEC_LOGIN-5-LOGIN_FAILED: Login failed [user: root] [Source: 10.0.0.99] at
+[ 11/40] <11>Oct 19 07:11:47 web01 probe[888]: probe failed: connect to 10.9.9.9:443 - No route to host
+[ 12/40] <14>Oct 19 07:11:47 mx-edge-01 mgd[2222]: UI_COMMIT_COMPLETED: cli command "commit" executed by operator
+[ 13/40] <131>Oct 19 07:11:47 sw-access-01: %SEC_LOGIN-5-LOGIN_FAILED: Login failed [user: root] [Source: 10.0.0.99] at
+[ 14/40] <187>date=2026-10-19 time=07:11:47 devname="FGT60F-001" devid="FG60F000000001" logid="0100020002" type="admin"
+[ 15/40] <14>Oct 19 07:11:47 db01 kernel: [12345.678] eth1: interface error: input errors 120, CRC errors 3
+[ 16/40] <14>Oct 19 07:11:47 mx-edge-01 rpd[1234]: OSPF neighbor 10.10.20.2 (via ge-0/0/0) state moved from Down to Ful
+[ 17/40] <14>Oct 19 07:11:47 mx-edge-01 rpd[1234]: OSPF neighbor 10.10.20.2 (via ge-0/0/0) state moved from Full to Dow
+[ 18/40] <14>Oct 19 07:11:47 web01 hostagent: cpu_utilization=93% threshold=80% memory_usage=91% threshold=90% high cpu
+[ 19/40] <130>Oct 19 07:11:47 rtr-core-01: %IPRT-4-UNREACHABLE: No route to host 10.5.5.5
+[ 20/40] <14>Oct 19 07:11:47 web01 systemd[1]: Started nginx.service - A high performance web server
+[ 21/40] <135>Oct 19 07:11:47 rtr-core-01: %BGP-5-ADJCHANGE: neighbor 10.10.10.1 Down - Connection closed by remote hos
+[ 22/40] <186>date=2026-10-19 time=07:11:47 devname="FGT60F-001" devid="FG60F000000001" logid="0100020004" type="event"
+[ 23/40] <14>Oct 19 07:11:48 web01 systemd[1]: Started nginx.service - A high performance web server
+[ 24/40] <12>Oct 19 07:11:48 mx-edge-01 bfdd[1337]: BFD session 10.10.20.1 state changed to Down
+[ 25/40] <85>1 2026-10-19T07:11:48.158Z web01 sshd - - - Failed password for root from 203.0.113.10 port 54322 ssh2
+[ 26/40] <132>Oct 19 07:11:48 sw-access-01: %SYS-3-MEMHIGH: memory_usage=94% threshold=90% high memory utilization
+[ 27/40] <184>date=2026-10-19 time=07:11:48 devname="FGT60F-001" devid="FG60F000000001" logid="0100020010" type="system
+[ 28/40] <135>Oct 19 07:11:48 rtr-core-01: %BGP-5-ADJCHANGE: neighbor 10.10.10.1 Down - Connection closed by remote hos
+[ 29/40] <14>Oct 19 07:11:48 web01 hostagent: configuration file /etc/nginx/nginx.conf changed by user deploy
+[ 30/40] <14>Oct 19 07:11:48 mx-edge-01 rpd[1234]: RTM_NEW: 172.16.10.0/24 via 10.10.20.1 flags RTF_GATEWAY
+[ 31/40] <186>date=2026-10-19 time=07:11:48 devname="FGT60F-001" devid="FG60F000000001" logid="0100020007" type="event"
+[ 32/40] <85>1 2026-10-19T07:11:48.525Z web01 sshd - - - Failed password for invalid user admin from 203.0.113.10 port 
+[ 33/40] <14>Oct 19 07:11:48 mx-edge-01 rpd[1234]: BGP - 10.10.20.1 External AS 65002 keepalive error: Connection close
+[ 34/40] <14>Oct 19 07:11:48 mx-edge-01 rpd[1234]: OSPF neighbor 10.10.20.2 (via ge-0/0/0) state moved from Down to Ful
+[ 35/40] <134>Oct 19 07:11:48 rtr-core-01: %LINEPROTO-5-UPDOWN: Line protocol on Interface GigabitEthernet0/1, changed 
+[ 36/40] <14>Oct 19 07:11:48 mx-edge-01 mgd[2222]: UI_COMMIT_COMPLETED: cli command "commit" executed by operator
+[ 37/40] <134>Oct 19 07:11:48 rtr-core-01: %BGP-5-ADJCHANGE: neighbor 10.10.10.1 Up - Opened
+[ 38/40] <85>1 2026-10-19T07:11:48.851Z web01 sshd - - - Failed password for invalid user admin from 203.0.113.10 port 
+[ 39/40] <14>Oct 19 07:11:48 mx-edge-01 mgd[2222]: UI_COMMIT_COMPLETED: cli command "commit" executed by operator
+[ 40/40] <184>date=2026-10-19 time=07:11:48 devname="FGT60F-001" devid="FG60F000000001" logid="0100020010" type="system
+Done - 40/40 messages sent.

@@ -1,0 +1,13 @@
+﻿syslog-platform-db|Up 47 minutes (healthy)|postgres:16.10-alpine
+syslog-platform-redis|Up 2 hours (healthy)|redis:7-alpine
+syslog-platform-frontend|Restarting (1) 29 seconds ago|log-applica-frontend
+syslog-platform-backend|Up 46 minutes (healthy)|8616b8d064d4
+buildx_buildkit_default|Up 2 hours|moby/buildkit:buildx-stable-1
+Private:	447.8MB
+Reclaimable:	641.2MB
+Total:		641.2MB
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          7         5         1.8GB     613.3MB (34%)
+Containers      5         5         102.4kB   0B (0%)
+Local Volumes   3         3         476.5MB   0B (0%)
+Build Cache     36        0         641.2MB   447.8MB

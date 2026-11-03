@@ -23,16 +23,31 @@ const BAND_COLORS = {
   healthy: '#059669',
 };
 
-function ChartCard({ title, subtitle, children, className = '' }) {
+function ChartCard({ title, subtitle, description, children, className = '' }) {
   return (
-    <div className={`flex flex-col rounded-lg border border-slate-200 bg-white shadow-sm ${className}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-          {title}
-        </h2>
-        {subtitle && <span className="text-xs text-slate-400">{subtitle}</span>}
+    <div
+      className={`flex flex-col rounded-xl border border-slate-700/80 bg-[#142136] shadow-lg shadow-black/10 ${className}`}
+    >
+      <div className="border-b border-slate-700/80 px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-200">
+            {title}
+          </h2>
+          {subtitle && (
+            <span className="rounded-full border border-slate-600 bg-slate-800/70 px-2.5 py-1 text-xs font-semibold text-blue-300">
+              {subtitle}
+            </span>
+          )}
+        </div>
+
+        {description && (
+          <p className="mt-1.5 text-xs leading-5 text-slate-400">
+            {description}
+          </p>
+        )}
       </div>
-      <div className="flex-1 p-3">{children}</div>
+
+      <div className="flex-1 p-4">{children}</div>
     </div>
   );
 }
@@ -72,12 +87,57 @@ function TrendChart({ points }) {
   return (
     <div className="relative">
       <svg
+  viewBox={`0 0 ${width} ${height}`}
+  className="h-auto w-full"
+  onMouseLeave={() => setHover(null)}
+  role="img"
+  aria-label="Event trend chart"
+>
+  <defs>
+    <linearGradient
+      id="event-area-gradient"
+      x1="0"
+      y1="0"
+      x2="0"
+      y2="1"
+    >
+      <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.35" />
+      <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.01" />
+    </linearGradient>
+
+    <linearGradient
+      id="event-line-gradient"
+      x1="0"
+      y1="0"
+      x2="1"
+      y2="0"
+    >
+      <stop offset="0%" stopColor="#38bdf8" />
+      <stop offset="100%" stopColor="#6366f1" />
+    </linearGradient>
+
+    <filter
+      id="event-line-glow"
+      x="-20%"
+      y="-50%"
+      width="140%"
+      height="200%"
+    >
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  {/* Keep your existing grid lines, paths, hover points and labels here */}
         viewBox={`0 0 ${width} ${height}`}
         className="h-auto w-full"
         onMouseLeave={() => setHover(null)}
         role="img"
         aria-label="Event trend chart"
-      >
+      
         {[0, 0.5, 1].map((fraction) => (
           <g key={fraction}>
             <line
@@ -85,7 +145,7 @@ function TrendChart({ points }) {
               x2={width - pad.r}
               y1={pad.t + fraction * innerH}
               y2={pad.t + fraction * innerH}
-              stroke="#e2e8f0"
+              stroke="#293b53"
               strokeWidth="1"
             />
             <text
@@ -100,8 +160,16 @@ function TrendChart({ points }) {
           </g>
         ))}
 
-        <path d={areaPath} fill="#3b82f6" fillOpacity="0.12" />
-        <path d={linePath} fill="none" stroke="#3b82f6" strokeWidth="2" />
+        <path d={areaPath} fill="url(#event-area-gradient)" />
+        <path
+  d={linePath}
+  fill="none"
+  stroke="url(#event-line-gradient)"
+  strokeWidth="3"
+  strokeLinecap="round"
+  strokeLinejoin="round"
+  filter="url(#event-line-glow)"
+/>
 
         {points.map((point, index) => (
           <g key={index}>
@@ -154,42 +222,97 @@ function TrendChart({ points }) {
  * device health charts. Rows are buttons so bars can act as filters.
  * items: [{ key, label, value }]
  */
-function BarList({ items, colorOf, selected, onSelect, emptyTitle, emptyHint }) {
+function BarList({
+  items,
+  colorOf,
+  selected,
+  onSelect,
+  emptyTitle,
+  emptyHint,
+}) {
   const total = items.reduce((sum, item) => sum + item.value, 0);
+
   if (total === 0) {
     return <EmptyBlock title={emptyTitle} hint={emptyHint} />;
   }
+
   const max = Math.max(1, ...items.map((item) => item.value));
 
+  const descriptions = {
+    CRITICAL: 'Immediate action required',
+    HIGH: 'Urgent investigation',
+    MEDIUM: 'Needs attention',
+    LOW: 'Minor issue',
+    INFO: 'Informational event',
+    OPEN: 'Awaiting investigation',
+    INVESTIGATING: 'Currently being investigated',
+    ACKNOWLEDGED: 'Accepted by an operator',
+    RESOLVED: 'Problem has been fixed',
+    CLOSED: 'Formally closed',
+  };
+
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       {items.map((item) => {
         const isSelected = selected === item.key;
         const dimmed = selected && !isSelected;
+        const color = colorOf(item.key);
+        const description =
+          descriptions[item.key] ||
+          (onSelect ? 'Click to view matching records' : 'Current device health score');
+
         return (
           <button
             key={item.key}
             onClick={() => onSelect && onSelect(item.key)}
-            className={`flex w-full items-center gap-2 rounded px-1 py-0.5 text-left transition ${
-              onSelect ? 'hover:bg-slate-50' : 'cursor-default'
-            } ${dimmed ? 'opacity-40' : ''} ${isSelected ? 'ring-2 ring-blue-500' : ''}`}
-            title={onSelect ? `Filter by ${item.label}` : undefined}
+            className={`group w-full rounded-lg border px-3 py-2.5 text-left transition-all duration-200 ${
+              isSelected
+                ? 'border-blue-500 bg-blue-500/10 ring-1 ring-blue-500/40'
+                : 'border-transparent bg-slate-800/40 hover:border-slate-600 hover:bg-slate-800/80'
+            } ${dimmed ? 'opacity-40' : ''} ${
+              onSelect ? 'cursor-pointer' : 'cursor-default'
+            }`}
+            title={onSelect ? `Filter by ${item.label}` : item.label}
+            aria-pressed={onSelect ? isSelected : undefined}
           >
-            <span className="w-24 shrink-0 truncate text-xs font-medium text-slate-600">
-              {item.label}
-            </span>
-            <span className="h-4 flex-1 rounded bg-slate-100">
-              <span
-                className="block h-4 rounded"
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor: color,
+                    boxShadow: `0 0 9px ${color}70`,
+                  }}
+                />
+
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-bold tracking-wide text-slate-200">
+                    {item.label}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">
+                    {description}
+                  </p>
+                </div>
+              </div>
+
+              <span className="shrink-0 rounded-md bg-slate-900/80 px-2.5 py-1 font-mono text-sm font-bold text-white">
+                {item.value}
+              </span>
+            </div>
+
+            <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-slate-700/80">
+              <div
+                className="h-full rounded-full transition-all duration-500"
                 style={{
-                  width: `${Math.max((item.value / max) * 100, item.value > 0 ? 4 : 0)}%`,
-                  backgroundColor: colorOf(item.key),
+                  width: `${Math.max(
+                    (item.value / max) * 100,
+                    item.value > 0 ? 3 : 0
+                  )}%`,
+                  backgroundColor: color,
+                  boxShadow: `0 0 8px ${color}55`,
                 }}
               />
-            </span>
-            <span className="w-10 shrink-0 text-right font-mono text-xs font-semibold text-slate-700">
-              {item.value}
-            </span>
+            </div>
           </button>
         );
       })}
@@ -229,13 +352,28 @@ export default function ChartsPanel({
   }
 
   const severityItems = alertSeverity || [];
-  const statusItems = incidentStatus || [];
-  const worstDevices = (health?.items || []).slice(0, 10);
+const statusItems = incidentStatus || [];
+const worstDevices = (health?.items || []).slice(0, 10);
+
+const totalAlerts = severityItems.reduce(
+  (sum, item) => sum + item.value,
+  0
+);
+
+const totalIncidents = statusItems.reduce(
+  (sum, item) => sum + item.value,
+  0
+);
 
   return (
     <section id="charts" className="mb-6">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ChartCard title="Event trend" subtitle={rangeLabel} className="lg:col-span-2">
+        <ChartCard
+  title="Event Trend"
+  subtitle={rangeLabel}
+  description="Number of syslog events received over time. Spikes can indicate increased network activity or potential issues."
+  className="lg:col-span-2"
+>
           {error ? (
             <ErrorBlock message={error} onRetry={onRetry} />
           ) : trend.length === 0 ? (
@@ -253,7 +391,11 @@ export default function ChartsPanel({
           )}
         </ChartCard>
 
-        <ChartCard title="Alerts by severity" subtitle="click to filter">
+        <ChartCard
+  title="Alert Distribution"
+  subtitle={`${totalAlerts} total alerts`}
+  description="Breakdown of detected network issues by severity. Higher severity means greater operational impact. Select a category to filter alerts."
+>
           {!error && (
             <BarList
               items={severityItems}
@@ -266,7 +408,11 @@ export default function ChartsPanel({
           )}
         </ChartCard>
 
-        <ChartCard title="Incidents by status" subtitle="click to filter">
+        <ChartCard
+  title="Incident Lifecycle"
+  subtitle={`${totalIncidents} total incidents`}
+  description="Tracks correlated network incidents through investigation and resolution. Select a status to filter incidents."
+>
           {!error && (
             <BarList
               items={statusItems}
@@ -280,14 +426,15 @@ export default function ChartsPanel({
         </ChartCard>
 
         <ChartCard
-          title="Device health"
-          subtitle={
-            health
-              ? `overall ${Math.round(health.overall_score)}/100 · ${health.band}`
-              : undefined
-          }
-          className="lg:col-span-2"
-        >
+  title="Device Health"
+  subtitle={
+    health
+      ? `Overall ${Math.round(health.overall_score)}/100 · ${health.band}`
+      : undefined
+  }
+  description="Network device health scores. Select a device to open its topology view."
+  className="lg:col-span-2"
+>
           {!health ? (
             <LoadingBlock label="Loading health scores…" rows={2} />
           ) : worstDevices.length === 0 ? (

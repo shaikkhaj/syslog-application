@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.detection.types import AlertSeverity, AlertStatus, DetectionResult
 from app.models.models import Alert, SyslogEvent
+from app.services.notification_service import create_notification
 
 logger = logging.getLogger(__name__)
 
@@ -81,5 +82,15 @@ def raise_alert(
         alert.severity,
         alert.title,
         alert.event_type,
+    )
+    # Fire an in-app notification for new alerts that meet the severity threshold.
+    create_notification(
+        db,
+        type="alert",
+        severity=alert.severity,
+        title=alert.title,
+        message=alert.message,
+        related_alert_id=alert.id,
+        context={"rule_name": alert.rule_name, "event_count": alert.event_count},
     )
     return alert, True

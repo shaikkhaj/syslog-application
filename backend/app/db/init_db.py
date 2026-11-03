@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import Base, SessionLocal, engine
 from app.models.models import EventType  # noqa: F401  (registers models on Base)
+from app.models.notification import Notification, NotificationSettings  # noqa: F401 (registers models on Base)
 from app.syslog.event_types import EVENT_TYPE_SEEDS
 
 logger = logging.getLogger(__name__)

@@ -1,0 +1,2 @@
+FROM node:20-alpine
+RUN uname -m && echo BUILDKIT_OK

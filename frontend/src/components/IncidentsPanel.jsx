@@ -6,6 +6,7 @@ import {
   fetchIncidentTimeline,
   resolveIncident,
 } from '../api/client.js';
+import { ErrorBlock, LoadingBlock } from './States.jsx';
 
 const SEVERITY_STYLES = {
   CRITICAL: 'bg-red-700 text-white',
@@ -175,7 +176,15 @@ function IncidentRow({ incident, busy, expanded, timeline, rca, onAct, onToggle 
   );
 }
 
-export default function IncidentsPanel({ incidents, live, onChanged, onError }) {
+export default function IncidentsPanel({
+  incidents,
+  live,
+  onChanged,
+  onError,
+  loading,
+  error,
+  onRetry,
+}) {
   const [busyId, setBusyId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [timeline, setTimeline] = useState([]);
@@ -231,7 +240,11 @@ export default function IncidentsPanel({ incidents, live, onChanged, onError }) 
         </span>
       </div>
 
-      {incidents.length === 0 ? (
+      {error ? (
+        <ErrorBlock message={error} onRetry={onRetry} />
+      ) : loading ? (
+        <LoadingBlock label="Loading incidents…" />
+      ) : incidents.length === 0 ? (
         <p className="p-6 text-center text-sm text-slate-500">
           No incidents yet — related alerts are correlated automatically.
         </p>
